@@ -5,11 +5,9 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.riskscanner.dependencyriskanalyzer.dto.DependencyEnrichmentDto;
 import com.riskscanner.dependencyriskanalyzer.model.DependencyCoordinate;
 import com.riskscanner.dependencyriskanalyzer.model.RiskLevel;
-
-import com.theokanning.openai.completion.chat.ChatCompletionRequest;
-import com.theokanning.openai.completion.chat.ChatMessage;
-import com.theokanning.openai.completion.chat.ChatMessageRole;
-import com.theokanning.openai.service.OpenAiService;
+import com.riskscanner.dependencyriskanalyzer.service.ai.AiClient;
+import com.riskscanner.dependencyriskanalyzer.service.ai.AiClientFactory;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
@@ -21,7 +19,7 @@ import java.util.List;
  * <p>Responsibilities:
  * <ul>
  *   <li>Read current AI provider/model and API key through {@link AiSettingsService}.</li>
- *   <li>Call the OpenAI Chat Completions API via {@link OpenAiService}.</li>
+ *   <li>Delegate to the appropriate {@link AiClient}.</li>
  *   <li>Produce a structured per-dependency risk assessment (JSON) and parse it into
  *   {@link DependencyRiskAnalysisResult} for caching/export.</li>
  * </ul>
@@ -33,21 +31,18 @@ import java.util.List;
  *   {@link #analyzeDependencyRisk(DependencyCoordinate, DependencyEnrichmentDto)} are the preferred APIs.</li>
  * </ul>
  */
+@Lazy
 @Service
 public class AIAnalysisService {
 
     private final AiSettingsService aiSettingsService;
     private final ObjectMapper objectMapper;
+    private final AiClientFactory aiClientFactory;
 
-    /**
-     * Constructs an instance of the AI analysis service.
-     *
-     * @param aiSettingsService the AI settings service
-     * @param objectMapper      the object mapper
-     */
-    public AIAnalysisService(AiSettingsService aiSettingsService, ObjectMapper objectMapper) {
+    public AIAnalysisService(AiSettingsService aiSettingsService, ObjectMapper objectMapper, @Lazy AiClientFactory aiClientFactory) {
         this.aiSettingsService = aiSettingsService;
         this.objectMapper = objectMapper;
+        this.aiClientFactory = aiClientFactory;
     }
 
     /**
@@ -61,27 +56,13 @@ public class AIAnalysisService {
      * @return the analysis result as a string
      */
     public String analyzeDependencies(List<String> dependencies) {
-        // Use a modern chat model like gpt-4o or gpt-3.5-turbo
-        OpenAiService openAiService = new OpenAiService(aiSettingsService.getApiKeyOrThrow());
-
-        // Chat models require a list of messages (System/User/Assistant)
-        List<ChatMessage> messages = new ArrayList<>();
-        messages.add(new ChatMessage(ChatMessageRole.SYSTEM.value(),
-                "You are a security expert specialized in Java dependency analysis."));
-        messages.add(new ChatMessage(ChatMessageRole.USER.value(),
-                buildPrompt(dependencies)));
-
-        // Use ChatCompletionRequest instead of CompletionRequest
-        ChatCompletionRequest chatRequest = ChatCompletionRequest.builder()
-                .model(aiSettingsService.getModel())
-                .messages(messages)
-                .maxTokens(1000)
-                .temperature(0.7)
-                .build();
-
-        // Call the chat completion endpoint
-        return openAiService.createChatCompletion(chatRequest)
-                .getChoices().get(0).getMessage().getContent().trim();
+        // Legacy method: not all providers implement free-form text; fallback to a simple concatenation
+        StringBuilder sb = new StringBuilder();
+        for (String dep : dependencies) {
+            sb.append("- ").append(dep).append("\n");
+        }
+        sb.append("\n(Only per-dependency structured analysis is supported for multi-provider mode.)");
+        return sb.toString();
     }
 
     /**
@@ -90,25 +71,12 @@ public class AIAnalysisService {
      * <p>This is used by the UI to validate configuration before running analysis.
      */
     public void testConnection() {
-        String provider = aiSettingsService.getProvider();
-        if (!"openai".equalsIgnoreCase(provider)) {
-            throw new IllegalStateException("Unsupported AI provider: " + provider);
-        }
-
-        OpenAiService openAiService = new OpenAiService(aiSettingsService.getApiKeyOrThrow());
-
-        List<ChatMessage> messages = new ArrayList<>();
-        messages.add(new ChatMessage(ChatMessageRole.SYSTEM.value(), "Return exactly 'pong'."));
-        messages.add(new ChatMessage(ChatMessageRole.USER.value(), "ping"));
-
-        ChatCompletionRequest chatRequest = ChatCompletionRequest.builder()
-                .model(aiSettingsService.getModel())
-                .messages(messages)
-                .maxTokens(5)
-                .temperature(0.0)
-                .build();
-
-        openAiService.createChatCompletion(chatRequest);
+        AiClient client = aiClientFactory.create(
+                aiSettingsService.getProvider(),
+                aiSettingsService.getApiKeyOrThrow(),
+                aiSettingsService.getModel()
+        );
+        client.testConnection();
     }
 
     /**
@@ -141,30 +109,14 @@ public class AIAnalysisService {
             throw new IllegalArgumentException("dependency must not be null");
         }
 
-        String provider = aiSettingsService.getProvider();
-        if (!"openai".equalsIgnoreCase(provider)) {
-            throw new IllegalStateException("Unsupported AI provider: " + provider);
-        }
-
-        OpenAiService openAiService = new OpenAiService(aiSettingsService.getApiKeyOrThrow());
-
-        List<ChatMessage> messages = new ArrayList<>();
-        messages.add(new ChatMessage(ChatMessageRole.SYSTEM.value(),
-                "You are a software supply-chain security expert. " +
-                        "You must respond with STRICT JSON only (no markdown, no code fences)."));
-        messages.add(new ChatMessage(ChatMessageRole.USER.value(), buildSingleDependencyPrompt(dependency, enrichment)));
-
-        ChatCompletionRequest chatRequest = ChatCompletionRequest.builder()
-                .model(aiSettingsService.getModel())
-                .messages(messages)
-                .maxTokens(600)
-                .temperature(0.2)
-                .build();
-
-        String content = openAiService.createChatCompletion(chatRequest)
-                .getChoices().get(0).getMessage().getContent().trim();
-
-        return parseDependencyRiskResult(content);
+        AiClient client = aiClientFactory.create(
+                aiSettingsService.getProvider(),
+                aiSettingsService.getApiKeyOrThrow(),
+                aiSettingsService.getModel()
+        );
+        AiClient.DependencyRiskAnalysisResult result = client.analyzeDependencyRisk(dependency, enrichment);
+        // Convert to legacy record type for compatibility with existing cache/response DTOs
+        return new DependencyRiskAnalysisResult(result.riskLevel(), result.riskScore(), result.explanation(), result.recommendations());
     }
 
     /**
