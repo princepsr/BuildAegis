@@ -39,8 +39,12 @@
         <h2 style="margin:0 0 10px; font-size:16px; color:#e8edf6;">AI Connection Setup</h2>
         <div class="row">
           <label>Provider</label>
-          <select id="provider">
+          <select id="provider" onchange="updateModelPlaceholder()">
             <option value="openai">OpenAI</option>
+            <option value="gemini">Google Gemini</option>
+            <option value="claude">Anthropic Claude</option>
+            <option value="ollama">Ollama (local)</option>
+            <option value="azure-openai">Azure OpenAI</option>
           </select>
         </div>
         <div class="row">
@@ -106,6 +110,23 @@
 
   <script>
     const $ = (id) => document.getElementById(id);
+
+    // Update model placeholder and example based on provider selection
+    function updateModelPlaceholder() {
+      const provider = $("provider").value;
+      const modelInput = $("model");
+      const examples = {
+        "openai": "gpt-4o",
+        "gemini": "gemini-1.5-flash",
+        "claude": "claude-3-5-haiku-20241022",
+        "ollama": "llama3.2",
+        "azure-openai": "gpt-4o"
+      };
+      modelInput.placeholder = examples[provider] || "model-name";
+      if (!modelInput.value || modelInput.value === "gpt-4o") {
+        modelInput.value = examples[provider] || "";
+      }
+    }
 
     function setStatus(el, text) {
       el.textContent = text || "";
