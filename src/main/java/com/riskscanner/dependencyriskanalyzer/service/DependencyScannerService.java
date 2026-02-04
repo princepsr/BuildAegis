@@ -103,24 +103,22 @@ public class DependencyScannerService {
 		doc.getDocumentElement().normalize();
 
 		Map<String, String> properties = readMavenProperties(doc);
+		Map<String, String> managedVersions = readMavenDependencyManagement(doc, properties);
+		String parentVersion = readParentVersion(doc);
+
 		XPath xPath = XPathFactory.newInstance().newXPath();
 
 		NodeList directDependencies = (NodeList) xPath.evaluate(
 				"/*[local-name()='project']/*[local-name()='dependencies']/*[local-name()='dependency']",
 				doc,
 				XPathConstants.NODESET);
-		NodeList managedDependencies = (NodeList) xPath.evaluate(
-				"/*[local-name()='project']/*[local-name()='dependencyManagement']/*[local-name()='dependencies']/*[local-name()='dependency']",
-				doc,
-				XPathConstants.NODESET);
 
-		addMavenDependenciesFromNodeList(directDependencies, dependencies, properties);
-		addMavenDependenciesFromNodeList(managedDependencies, dependencies, properties);
+		addMavenDependenciesFromNodeList(directDependencies, dependencies, properties, managedVersions, parentVersion);
 
 		return dependencies;
 	}
 
-	private void addMavenDependenciesFromNodeList(NodeList nodeList, List<DependencyCoordinate> dependencies, Map<String, String> properties) {
+	private void addMavenDependenciesFromNodeList(NodeList nodeList, List<DependencyCoordinate> dependencies, Map<String, String> properties, Map<String, String> managedVersions, String parentVersion) {
 		if (nodeList == null) {
 			return;
 		}
@@ -134,7 +132,17 @@ public class DependencyScannerService {
 				// Extract groupId, artifactId, and version
 				String groupId = getTagValue("groupId", element);
 				String artifactId = getTagValue("artifactId", element);
-				String version = resolveMavenVersion(getTagValue("version", element), properties);
+				String version = getTagValue("version", element);
+
+				// Resolve version using hierarchy: explicit > dependencyManagement > parent version
+				if (version == null || version.trim().isEmpty()) {
+					String key = (groupId == null ? "" : groupId) + ":" + artifactId;
+					version = managedVersions.get(key);
+				}
+				if (version == null || version.trim().isEmpty()) {
+					version = parentVersion;
+				}
+				version = resolveMavenVersion(version, properties);
 
 				dependencies.add(new DependencyCoordinate(
 						groupId == null ? "Unknown" : groupId,
@@ -156,6 +164,57 @@ public class DependencyScannerService {
 		}
 		Node node = nodeList.item(0);
 		return node.getTextContent();
+	}
+
+	private Map<String, String> readMavenDependencyManagement(Document doc, Map<String, String> properties) {
+		Map<String, String> managedVersions = new HashMap<>();
+		NodeList dmNodes = doc.getElementsByTagNameNS("*", "dependencyManagement");
+		if (dmNodes.getLength() == 0) {
+			dmNodes = doc.getElementsByTagName("dependencyManagement");
+		}
+		if (dmNodes.getLength() == 0) {
+			return managedVersions;
+		}
+		Node dmNode = dmNodes.item(0);
+		NodeList deps = dmNode.getChildNodes();
+		for (int i = 0; i < deps.getLength(); i++) {
+			Node dep = deps.item(i);
+			if (dep.getNodeType() != Node.ELEMENT_NODE || !"dependencies".equals(dep.getLocalName())) {
+				continue;
+			}
+			NodeList depList = dep.getChildNodes();
+			for (int j = 0; j < depList.getLength(); j++) {
+				Node depItem = depList.item(j);
+				if (depItem.getNodeType() != Node.ELEMENT_NODE || !"dependency".equals(depItem.getLocalName())) {
+					continue;
+				}
+				Element depEl = (Element) depItem;
+				String groupId = getTagValue("groupId", depEl);
+				String artifactId = getTagValue("artifactId", depEl);
+				String version = getTagValue("version", depEl);
+				if (groupId != null && artifactId != null && version != null) {
+					String key = groupId + ":" + artifactId;
+					managedVersions.put(key, resolveMavenVersion(version, properties));
+				}
+			}
+		}
+		return managedVersions;
+	}
+
+	private String readParentVersion(Document doc) {
+		NodeList parentNodes = doc.getElementsByTagNameNS("*", "parent");
+		if (parentNodes.getLength() == 0) {
+			parentNodes = doc.getElementsByTagName("parent");
+		}
+		if (parentNodes.getLength() == 0) {
+			return null;
+		}
+		Node parentNode = parentNodes.item(0);
+		if (parentNode.getNodeType() != Node.ELEMENT_NODE) {
+			return null;
+		}
+		Element parentEl = (Element) parentNode;
+		return getTagValue("version", parentEl);
 	}
 
 	private Map<String, String> readMavenProperties(Document doc) {
