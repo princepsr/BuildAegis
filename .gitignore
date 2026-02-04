@@ -31,3 +31,5 @@ build/
 
 ### VS Code ###
 .vscode/
+data/risk-scanner.mv.db
+data/risk-scanner.trace.db
