@@ -1,0 +1,165 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+    <include resource="org/springframework/boot/logging/logback/defaults.xml"/>
+    
+    <property name="LOGS_PATH" value="./logs"/>
+    <property name="LOG_FILE" value="${LOGS_PATH}/risk-scanner"/>
+    
+    <!-- Console Appender with Structured Logging -->
+    <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder class="net.logstash.logback.encoder.LoggingEventCompositeJsonEncoder">
+            <providers>
+                <timestamp/>
+                <logLevel/>
+                <loggerName/>
+                <mdc/>
+                <message/>
+                <stackTrace/>
+            </providers>
+        </encoder>
+    </appender>
+
+    <!-- File Appender with Structured Logging -->
+    <appender name="FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>${LOG_FILE}.log</file>
+        <encoder class="net.logstash.logback.encoder.LoggingEventCompositeJsonEncoder">
+            <providers>
+                <timestamp/>
+                <logLevel/>
+                <loggerName/>
+                <mdc/>
+                <message/>
+                <stackTrace/>
+            </providers>
+        </encoder>
+        <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+            <fileNamePattern>${LOG_FILE}.%d{yyyy-MM-dd}.%i.log</fileNamePattern>
+            <timeBasedFileNamingAndTriggeringPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedFNATP">
+                <maxFileSize>100MB</maxFileSize>
+            </timeBasedFileNamingAndTriggeringPolicy>
+            <maxHistory>30</maxHistory>
+            <totalSizeCap>3GB</totalSizeCap>
+        </rollingPolicy>
+    </appender>
+
+    <!-- Error File Appender -->
+    <appender name="ERROR_FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>${LOG_FILE}-error.log</file>
+        <encoder class="net.logstash.logback.encoder.LoggingEventCompositeJsonEncoder">
+            <providers>
+                <timestamp/>
+                <logLevel/>
+                <loggerName/>
+                <mdc/>
+                <message/>
+                <stackTrace/>
+            </providers>
+        </encoder>
+        <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+            <fileNamePattern>${LOG_FILE}-error.%d{yyyy-MM-dd}.%i.log</fileNamePattern>
+            <timeBasedFileNamingAndTriggeringPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedFNATP">
+                <maxFileSize>100MB</maxFileSize>
+            </timeBasedFileNamingAndTriggeringPolicy>
+            <maxHistory>30</maxHistory>
+            <totalSizeCap>1GB</totalSizeCap>
+        </rollingPolicy>
+        <filter class="ch.qos.logback.classic.filter.LevelFilter">
+            <level>ERROR</level>
+            <onMatch>ACCEPT</onMatch>
+            <onMismatch>DENY</onMismatch>
+        </filter>
+    </appender>
+
+    <!-- Security Audit Appender -->
+    <appender name="SECURITY_AUDIT" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>${LOG_FILE}-security.log</file>
+        <encoder class="net.logstash.logback.encoder.LoggingEventCompositeJsonEncoder">
+            <providers>
+                <timestamp/>
+                <logLevel/>
+                <loggerName/>
+                <mdc/>
+                <message/>
+                <stackTrace/>
+            </providers>
+        </encoder>
+        <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+            <fileNamePattern>${LOG_FILE}-security.%d{yyyy-MM-dd}.%i.log</fileNamePattern>
+            <timeBasedFileNamingAndTriggeringPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedFNATP">
+                <maxFileSize>50MB</maxFileSize>
+            </timeBasedFileNamingAndTriggeringPolicy>
+            <maxHistory>90</maxHistory>
+            <totalSizeCap>2GB</totalSizeCap>
+        </rollingPolicy>
+    </appender>
+
+    <!-- Application Logger -->
+    <logger name="com.riskscanner.dependencyriskanalyzer" level="INFO" additivity="false">
+        <appender-ref ref="CONSOLE"/>
+        <appender-ref ref="FILE"/>
+        <appender-ref ref="ERROR_FILE"/>
+    </logger>
+
+    <!-- Security Logger -->
+    <logger name="com.riskscanner.dependencyriskanalyzer.security" level="INFO" additivity="false">
+        <appender-ref ref="CONSOLE"/>
+        <appender-ref ref="SECURITY_AUDIT"/>
+        <appender-ref ref="ERROR_FILE"/>
+    </logger>
+
+    <!-- Vulnerability Analysis Logger -->
+    <logger name="com.riskscanner.dependencyriskanalyzer.service.vulnerability" level="DEBUG" additivity="false">
+        <appender-ref ref="CONSOLE"/>
+        <appender-ref ref="FILE"/>
+        <appender-ref ref="ERROR_FILE"/>
+    </logger>
+
+    <!-- Dependency Resolution Logger -->
+    <logger name="com.riskscanner.dependencyriskanalyzer.service.dependency" level="DEBUG" additivity="false">
+        <appender-ref ref="CONSOLE"/>
+        <appender-ref ref="FILE"/>
+        <appender-ref ref="ERROR_FILE"/>
+    </logger>
+
+    <!-- AI Service Logger -->
+    <logger name="com.riskscanner.dependencyriskanalyzer.service.ai" level="INFO" additivity="false">
+        <appender-ref ref="CONSOLE"/>
+        <appender-ref ref="FILE"/>
+        <appender-ref ref="ERROR_FILE"/>
+    </logger>
+
+    <!-- Spring Framework -->
+    <logger name="org.springframework" level="WARN"/>
+    <logger name="org.springframework.web" level="INFO"/>
+    <logger name="org.springframework.security" level="WARN"/>
+
+    <!-- Database -->
+    <logger name="org.hibernate.SQL" level="DEBUG"/>
+    <logger name="org.hibernate.type.descriptor.sql.BasicBinder" level="TRACE"/>
+
+    <!-- HikariCP -->
+    <logger name="com.zaxxer.hikari" level="INFO"/>
+
+    <!-- Root Logger -->
+    <root level="INFO">
+        <appender-ref ref="CONSOLE"/>
+        <appender-ref ref="FILE"/>
+        <appender-ref ref="ERROR_FILE"/>
+    </root>
+
+    <!-- Development Profile -->
+    <springProfile name="dev">
+        <logger name="com.riskscanner.dependencyriskanalyzer" level="DEBUG"/>
+        <logger name="org.springframework.web" level="DEBUG"/>
+        <logger name="org.hibernate.SQL" level="DEBUG"/>
+        <logger name="org.hibernate.type.descriptor.sql.BasicBinder" level="TRACE"/>
+    </springProfile>
+
+    <!-- Production Profile -->
+    <springProfile name="prod">
+        <logger name="com.riskscanner.dependencyriskanalyzer" level="INFO"/>
+        <logger name="org.springframework.web" level="WARN"/>
+        <logger name="org.hibernate.SQL" level="WARN"/>
+        <logger name="org.hibernate.type.descriptor.sql.BasicBinder" level="OFF"/>
+    </springProfile>
+</configuration>

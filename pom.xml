@@ -123,11 +123,18 @@
 			<version>0.18.2</version>
 		</dependency>
 
-		<!-- Logback for logging -->
-		<dependency>
-			<groupId>org.springframework.boot</groupId>
-			<artifactId>spring-boot-starter-logging</artifactId>
-		</dependency>
+        <!-- Logstash Logback Encoder for structured logging -->
+        <dependency>
+            <groupId>net.logstash.logback</groupId>
+            <artifactId>logstash-logback-encoder</artifactId>
+            <version>7.4</version>
+        </dependency>
+
+        <!-- Jackson for JSON processing -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-logging</artifactId>
+        </dependency>
 
 		<!-- Lombok for reducing boilerplate code -->
 		<dependency>
