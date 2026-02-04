@@ -1,12 +1,11 @@
 package com.riskscanner.dependencyriskanalyzer.service;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.riskscanner.dependencyriskanalyzer.dto.DependencyEnrichmentDto;
 import com.riskscanner.dependencyriskanalyzer.model.DependencyCoordinate;
-import com.riskscanner.dependencyriskanalyzer.model.RiskLevel;
+import com.riskscanner.dependencyriskanalyzer.service.ai.AIExplanationService;
 import com.riskscanner.dependencyriskanalyzer.service.ai.AiClient;
 import com.riskscanner.dependencyriskanalyzer.service.ai.AiClientFactory;
+import com.riskscanner.dependencyriskanalyzer.service.ai.DeterministicRiskCalculator;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 
@@ -14,35 +13,37 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * AI integration layer for the application.
+ * Risk analysis service that combines deterministic calculation with optional AI explanations.
  *
  * <p>Responsibilities:
  * <ul>
- *   <li>Read current AI provider/model and API key through {@link AiSettingsService}.</li>
- *   <li>Delegate to the appropriate {@link AiClient}.</li>
- *   <li>Produce a structured per-dependency risk assessment (JSON) and parse it into
- *   {@link DependencyRiskAnalysisResult} for caching/export.</li>
+ *   <li>Calculate risk levels deterministically using objective metrics.</li>
+ *   <li>Generate natural language explanations using AI when available.</li>
+ *   <li>Provide fallback explanations when AI is not configured.</li>
+ *   <li>Maintain backward compatibility with existing APIs.</li>
  * </ul>
  *
- * <p>Notes for developers:
- * <ul>
- *   <li>The multi-dependency method {@link #analyzeDependencies(List)} is a legacy endpoint that returns free-form text.</li>
- *   <li>The per-dependency methods {@link #analyzeDependencyRisk(DependencyCoordinate)} and
- *   {@link #analyzeDependencyRisk(DependencyCoordinate, DependencyEnrichmentDto)} are the preferred APIs.</li>
- * </ul>
+ * <p>AI is used only for explanations and recommendations, not for risk assessment.
  */
 @Lazy
 @Service
 public class AIAnalysisService {
 
     private final AiSettingsService aiSettingsService;
-    private final ObjectMapper objectMapper;
     private final AiClientFactory aiClientFactory;
+    private final DeterministicRiskCalculator riskCalculator;
+    private final AIExplanationService explanationService;
 
-    public AIAnalysisService(AiSettingsService aiSettingsService, ObjectMapper objectMapper, @Lazy AiClientFactory aiClientFactory) {
+    public AIAnalysisService(
+            AiSettingsService aiSettingsService,
+            @Lazy AiClientFactory aiClientFactory,
+            DeterministicRiskCalculator riskCalculator,
+            AIExplanationService explanationService
+    ) {
         this.aiSettingsService = aiSettingsService;
-        this.objectMapper = objectMapper;
         this.aiClientFactory = aiClientFactory;
+        this.riskCalculator = riskCalculator;
+        this.explanationService = explanationService;
     }
 
     /**
@@ -69,8 +70,12 @@ public class AIAnalysisService {
      * Tests that the currently configured provider/model/api key can successfully reach the AI provider.
      *
      * <p>This is used by the UI to validate configuration before running analysis.
+     * If AI is not configured, this will throw an exception.
      */
     public void testConnection() {
+        if (!explanationService.isAvailable()) {
+            throw new IllegalStateException("AI is not configured. Please configure an AI provider and API key.");
+        }
         AiClient client = aiClientFactory.create(
                 aiSettingsService.getProvider(),
                 aiSettingsService.getApiKeyOrThrow(),
@@ -80,7 +85,16 @@ public class AIAnalysisService {
     }
 
     /**
-     * Analyzes a single dependency using AI.
+     * Checks if AI is configured and available for generating explanations.
+     *
+     * @return true if AI is available; false if fallback will be used
+     */
+    public boolean isAIAvailable() {
+        return explanationService.isAvailable();
+    }
+
+    /**
+     * Analyzes a single dependency using deterministic calculation and optional AI explanation.
      *
      * <p>This overload performs analysis without enrichment. Prefer
      * {@link #analyzeDependencyRisk(DependencyCoordinate, DependencyEnrichmentDto)} when enrichment is available.
@@ -93,12 +107,11 @@ public class AIAnalysisService {
     }
 
     /**
-     * Analyzes a single dependency using AI and optional enrichment.
+     * Analyzes a single dependency using deterministic risk calculation and optional AI explanation.
      *
-     * <p>Expected output is strict JSON that matches the schema described in
-     * {@link #buildSingleDependencyPrompt(DependencyCoordinate, DependencyEnrichmentDto)}. If parsing fails,
-     * the method returns a result with {@link RiskLevel#UNKNOWN} and includes the raw response text in
-     * {@link DependencyRiskAnalysisResult#explanation()} for visibility.
+     * <p>Risk level and score are calculated deterministically based on objective metrics.
+     * AI is used only for generating natural language explanations and recommendations when available.
+     * If AI is not configured, deterministic template-based explanations are provided.
      *
      * @param dependency the dependency to analyze
      * @param enrichment the enrichment data (optional)
@@ -109,126 +122,31 @@ public class AIAnalysisService {
             throw new IllegalArgumentException("dependency must not be null");
         }
 
-        AiClient client = aiClientFactory.create(
-                aiSettingsService.getProvider(),
-                aiSettingsService.getApiKeyOrThrow(),
-                aiSettingsService.getModel()
+        // Step 1: Calculate risk deterministically
+        DeterministicRiskCalculator.RiskResult riskResult = riskCalculator.calculateRisk(dependency, enrichment);
+
+        // Step 2: Generate explanation (AI if available, otherwise fallback)
+        AIExplanationService.ExplanationResult explanationResult = explanationService.explainRisk(
+                dependency,
+                enrichment,
+                riskResult.riskLevel().name(),
+                riskResult.riskScore()
         );
-        AiClient.DependencyRiskAnalysisResult result = client.analyzeDependencyRisk(dependency, enrichment);
-        // Convert to legacy record type for compatibility with existing cache/response DTOs
-        return new DependencyRiskAnalysisResult(result.riskLevel(), result.riskScore(), result.explanation(), result.recommendations());
+
+        // Step 3: Combine results
+        return new DependencyRiskAnalysisResult(
+                riskResult.riskLevel(),
+                riskResult.riskScore(),
+                explanationResult.explanation(),
+                explanationResult.recommendations()
+        );
     }
 
     /**
-     * Builds a prompt for analyzing multiple dependencies.
-     *
-     * @param dependencies the dependencies to analyze
-     * @return the prompt
-     */
-    private String buildPrompt(List<String> dependencies) {
-        StringBuilder prompt = new StringBuilder();
-        prompt.append("Analyze the following Java dependencies for security vulnerabilities, ");
-        prompt.append("known issues, and maintenance status:\n\n");
-
-        for (String dep : dependencies) {
-            prompt.append("- ").append(dep).append("\n");
-        }
-        return prompt.toString();
-    }
-
-    /**
-     * Builds a prompt for analyzing a single dependency.
-     *
-     * @param dependency the dependency to analyze
-     * @param enrichment the enrichment data (optional)
-     * @return the prompt
-     */
-    private String buildSingleDependencyPrompt(DependencyCoordinate dependency, DependencyEnrichmentDto enrichment) {
-        StringBuilder sb = new StringBuilder();
-        sb.append("Dependency: ")
-                .append(dependency.groupId())
-                .append(":")
-                .append(dependency.artifactId())
-                .append(":")
-                .append(dependency.version())
-                .append("\n");
-        sb.append("BuildTool: ").append(dependency.buildTool()).append("\n");
-
-        if (enrichment != null) {
-            sb.append("\nEnrichment:\n");
-            if (enrichment.vulnerabilityCount() != null) {
-                sb.append("Known Vulnerabilities Count: ").append(enrichment.vulnerabilityCount()).append("\n");
-            }
-            if (enrichment.vulnerabilityIds() != null && !enrichment.vulnerabilityIds().isEmpty()) {
-                sb.append("Vulnerability IDs: ").append(String.join(", ", enrichment.vulnerabilityIds())).append("\n");
-            }
-            if (enrichment.scmUrl() != null) {
-                sb.append("SCM URL: ").append(enrichment.scmUrl()).append("\n");
-            }
-            if (enrichment.githubRepo() != null) {
-                sb.append("GitHub Repo: ").append(enrichment.githubRepo()).append("\n");
-            }
-            if (enrichment.githubStars() != null) {
-                sb.append("GitHub Stars: ").append(enrichment.githubStars()).append("\n");
-            }
-            if (enrichment.githubOpenIssues() != null) {
-                sb.append("GitHub Open Issues: ").append(enrichment.githubOpenIssues()).append("\n");
-            }
-            if (enrichment.githubLastPushedAt() != null) {
-                sb.append("GitHub Last Pushed At: ").append(enrichment.githubLastPushedAt()).append("\n");
-            }
-        }
-
-        sb.append("\nTask: Estimate maintenance and security risk using the dependency identifier and enrichment (if present). ");
-        sb.append("Provide a risk level and short plain-English explanation.\n\n");
-        sb.append("Return JSON with this exact schema:\n");
-        sb.append("{\n");
-        sb.append("  \"riskLevel\": \"HIGH\" | \"MEDIUM\" | \"LOW\" | \"UNKNOWN\",\n");
-        sb.append("  \"riskScore\": number (0-100),\n");
-        sb.append("  \"explanation\": string,\n");
-        sb.append("  \"recommendations\": [string]\n");
-        sb.append("}");
-        return sb.toString();
-    }
-
-    /**
-     * Parses the result of the dependency risk analysis.
-     *
-     * @param json the result as JSON
-     * @return the parsed result
-     */
-    private DependencyRiskAnalysisResult parseDependencyRiskResult(String json) {
-        try {
-            JsonNode node = objectMapper.readTree(json);
-            RiskLevel riskLevel;
-            try {
-                riskLevel = RiskLevel.valueOf(node.path("riskLevel").asText("UNKNOWN").toUpperCase());
-            } catch (Exception ignored) {
-                riskLevel = RiskLevel.UNKNOWN;
-            }
-
-            Integer riskScore = node.hasNonNull("riskScore") ? node.get("riskScore").asInt() : null;
-            String explanation = node.path("explanation").asText("");
-
-            List<String> recommendations = new ArrayList<>();
-            JsonNode recs = node.path("recommendations");
-            if (recs.isArray()) {
-                for (JsonNode rec : recs) {
-                    recommendations.add(rec.asText());
-                }
-            }
-
-            return new DependencyRiskAnalysisResult(riskLevel, riskScore, explanation, recommendations);
-        } catch (Exception e) {
-            return new DependencyRiskAnalysisResult(RiskLevel.UNKNOWN, null, json, List.of());
-        }
-    }
-
-    /**
-     * Parsed structured result returned by the AI provider.
+     * Parsed structured result returned by the analysis service.
      */
     public record DependencyRiskAnalysisResult(
-            RiskLevel riskLevel,
+            com.riskscanner.dependencyriskanalyzer.model.RiskLevel riskLevel,
             Integer riskScore,
             String explanation,
             List<String> recommendations
