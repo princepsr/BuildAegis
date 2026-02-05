@@ -203,6 +203,19 @@ body{
   font-size:12px;
 }
 
+/* AI Status Messages */
+.ai-status{margin:10px 0 0; padding:8px 12px; border-radius:8px; font-size:12px; min-height:20px;}
+.ai-status--info{color:var(--accent); background:rgba(77,163,255,.1); border:1px solid rgba(77,163,255,.2);}
+.ai-status--success{color:var(--good); background:rgba(34,197,94,.1); border:1px solid rgba(34,197,94,.2);}
+.ai-status--error{color:var(--bad); background:rgba(239,68,68,.1); border:1px solid rgba(239,68,68,.2);}
+.ai-status--warning{color:var(--warn); background:rgba(245,158,11,.1); border:1px solid rgba(245,158,11,.2);}
+
+/* AI Action Buttons */
+.ai-actions{display:flex; gap:10px; margin-top:12px;}
+
+/* Single Dep Analysis */
+#singleDepTitle{margin-bottom:6px;}
+
 .context-note{
   margin:10px 0 0;
   padding:10px;
@@ -946,4 +959,5 @@ body{
 .vuln-count--low{color:rgba(34,197,94,.9);}
 
 /* Export button spacing */
-#exportResults{margin-right:12px;}
+#exportCSV, #exportJSON, #exportPDF{margin-right:8px;}
+#manageSuppressions{margin-right:12px;}

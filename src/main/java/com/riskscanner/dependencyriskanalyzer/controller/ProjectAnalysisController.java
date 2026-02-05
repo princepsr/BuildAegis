@@ -2,19 +2,15 @@ package com.riskscanner.dependencyriskanalyzer.controller;
 
 import com.riskscanner.dependencyriskanalyzer.dto.ProjectAnalysisRequest;
 import com.riskscanner.dependencyriskanalyzer.dto.ProjectAnalysisResponse;
-import com.riskscanner.dependencyriskanalyzer.model.DependencyCoordinate;
 import com.riskscanner.dependencyriskanalyzer.service.DependencyScannerService;
 import com.riskscanner.dependencyriskanalyzer.service.ProjectAnalysisService;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.List;
-
 /**
  * Project-level REST API.
  *
- * <p>Primary entry points used by the UI:
+ * <p>Primary entry point used by the UI:
  * <ul>
- *   <li>{@code GET /api/project/scan} - returns detected dependencies</li>
  *   <li>{@code POST /api/project/analyze} - scan + enrich + AI analyze + cache</li>
  * </ul>
  */
@@ -28,16 +24,6 @@ public class ProjectAnalysisController {
     public ProjectAnalysisController(DependencyScannerService dependencyScannerService, ProjectAnalysisService projectAnalysisService) {
         this.dependencyScannerService = dependencyScannerService;
         this.projectAnalysisService = projectAnalysisService;
-    }
-
-    /**
-     * Scans a project path and returns dependency coordinates.
-     *
-     * @param projectPath a directory containing a build file, or a direct build file path
-     */
-    @GetMapping("/scan")
-    public List<DependencyCoordinate> scan(@RequestParam("projectPath") String projectPath) throws Exception {
-        return dependencyScannerService.scanProject(projectPath);
     }
 
     /**

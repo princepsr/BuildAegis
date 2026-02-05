@@ -163,14 +163,56 @@
                 </div>
 
                 <div class="form-row">
-                  <label class="form-label" for="aiApiKey">API key</label>
-                  <input class="form-input" id="aiApiKey" name="aiApiKey" type="password" placeholder="(not stored)" autocomplete="off">
+                  <label class="form-label" for="aiModel">Model</label>
+                  <input class="form-input" id="aiModel" name="aiModel" type="text" placeholder="e.g. gpt-4o-mini" value="gpt-4o-mini">
                 </div>
+
+                <div class="form-row">
+                  <label class="form-label" for="aiApiKey">API key</label>
+                  <input class="form-input" id="aiApiKey" name="aiApiKey" type="password" placeholder="(stored encrypted if configured)" autocomplete="off">
+                </div>
+                
+                <div class="form-actions ai-actions">
+                  <button type="button" id="testAIConnection" class="btn btn--ghost">
+                    <span>Test Connection</span>
+                  </button>
+                  <button type="button" id="saveAISettings" class="btn btn--secondary">
+                    <span>Save Settings</span>
+                  </button>
+                </div>
+                
+                <p class="helper ai-status" id="aiStatus"></p>
               </fieldset>
             </section>
 
-            
-          </div>
+        <section class="card card--optional" aria-labelledby="singleDepTitle">
+              <div class="card__title-row">
+                <h3 id="singleDepTitle" class="card__title">Single Dependency Analysis</h3>
+                <p class="helper">Analyze a specific dependency without scanning a full project</p>
+              </div>
+
+              <div class="form-row">
+                <label class="form-label" for="singleGroupId">Group ID</label>
+                <input class="form-input" id="singleGroupId" placeholder="e.g. org.springframework" type="text">
+              </div>
+
+              <div class="form-row">
+                <label class="form-label" for="singleArtifactId">Artifact ID</label>
+                <input class="form-input" id="singleArtifactId" placeholder="e.g. spring-core" type="text">
+              </div>
+
+              <div class="form-row">
+                <label class="form-label" for="singleVersion">Version</label>
+                <input class="form-input" id="singleVersion" placeholder="e.g. 5.3.21" type="text">
+              </div>
+
+              <div class="form-actions">
+                <button type="button" id="analyzeSingleDep" class="btn btn--secondary">
+                  <span class="btn__icon">🔍</span>
+                  <span>Analyze Dependency</span>
+                </button>
+              </div>
+            </section>
         </section>
 
         <section class="panel panel--right" aria-labelledby="panelRightTitle">
@@ -310,8 +352,17 @@
                 </div>
 
                 <div class="filters__row filters__row--right">
-                  <button type="button" id="exportResults" class="btn btn--ghost" title="Export to CSV">
-                    <span>📥 Export CSV</span>
+                  <button type="button" id="exportCSV" class="btn btn--ghost" title="Export to CSV">
+                    <span>📄 Export CSV</span>
+                  </button>
+                  <button type="button" id="exportJSON" class="btn btn--ghost" title="Export JSON report">
+                    <span>📄 Export JSON</span>
+                  </button>
+                  <button type="button" id="exportPDF" class="btn btn--ghost" title="Export PDF report">
+                    <span>� Export PDF</span>
+                  </button>
+                  <button type="button" id="manageSuppressions" class="btn btn--ghost" title="View and manage suppressed vulnerabilities">
+                    <span>🚫 Suppressions</span>
                   </button>
                   <span class="meta" id="findingsCount">0 findings</span>
                 </div>

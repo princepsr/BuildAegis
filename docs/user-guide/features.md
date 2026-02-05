@@ -99,6 +99,23 @@ Confidence indicates reliability of vulnerability detection:
 - **Ollama**: Local models (Llama3, Mistral, etc.)
 - **Azure OpenAI**: Enterprise deployments
 
+#### AI Configuration Persistence
+
+The UI now supports saving AI settings to the backend:
+
+1. **Enable AI Toggle** - Turn on "Enable AI-assisted analysis"
+2. **Select Provider** - Choose from dropdown (OpenAI, Claude, etc.)
+3. **Enter Model** - Specify model name (e.g., "gpt-4o-mini")
+4. **Enter API Key** - Your provider API key
+5. **Save Settings** - Click "Save Settings" to persist (encrypted if configured)
+6. **Test Connection** - Click "Test Connection" to verify connectivity
+
+**Security Notes:**
+- API keys are encrypted at rest when `riskscanner.encryption.secret` is configured
+- Settings persist across browser sessions
+- Each provider+model combination is stored separately
+- Keys are never displayed in the UI after saving
+
 #### AI Features
 
 **Risk Explanations**
@@ -228,7 +245,62 @@ Click "Export CSV" to download findings as CSV with columns:
 - Description
 - Recommendations
 
-### 12. Load Cached Results
+#### JSON Export
+Click "Export JSON" to download a complete analysis report:
+- Full dependency details
+- All vulnerability data
+- Risk scores and explanations
+- AI analysis results
+- Metadata and timestamps
+
+#### PDF Export
+Click "Export PDF" to generate a formatted PDF report:
+- Professional layout for sharing
+- Executive summary
+- Detailed findings
+- Charts and visualizations
+- Suitable for compliance documentation
+
+### 12. Vulnerability Suppression Management
+
+Manage suppressed vulnerabilities directly from the UI:
+
+**Access Suppression Manager:**
+1. Click "🚫 Suppressions" button in the filters area
+2. View active suppressions and audit log
+
+**Features:**
+- **Active Suppressions**: List of currently suppressed findings
+- **Audit Log**: History of suppress/unsuppress actions
+- **Unsuppress**: Re-enable previously suppressed vulnerabilities
+
+**In the Detail Modal:**
+- Click to suppress a specific finding with reason
+- Provide justification for compliance
+
+### 13. Single Dependency Analysis
+
+Analyze a specific dependency without scanning a full project:
+
+1. **Enter Coordinates:**
+   - Group ID (e.g., "org.springframework")
+   - Artifact ID (e.g., "spring-core")
+   - Version (e.g., "5.3.21")
+
+2. **Click "Analyze Dependency"**
+
+3. **Results:**
+   - Vulnerabilities specific to that version
+   - CVE details
+   - Risk assessment
+   - AI explanations (if enabled)
+
+Useful for:
+- Checking dependencies before adding to project
+- Evaluating specific version upgrades
+- Quick security checks
+
+### 14. Load Cached Results
 
 Quickly reload previous analysis:
 1. Enter project path

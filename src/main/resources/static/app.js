@@ -36,7 +36,16 @@ const RiskScanner = (() => {
     BASE_URL: '/api',
     ENDPOINTS: {
       PROJECT_ANALYZE: '/project/analyze',
-      CACHED_RESULTS: '/dashboard/cached-results'
+      CACHED_RESULTS: '/dashboard/cached-results',
+      AI_SETTINGS: '/ai/settings',
+      AI_TEST: '/ai/test-connection',
+      EXPORT_JSON: '/export/json',
+      EXPORT_PDF: '/export/pdf',
+      VULN_ANALYZE: '/vulnerabilities/analyze',
+      VULN_SUPPRESS: '/vulnerabilities/suppress',
+      VULN_UNSUPPRESS: '/vulnerabilities/unsuppress',
+      VULN_SUPPRESSIONS: '/vulnerabilities/suppressions',
+      VULN_AUDIT: '/vulnerabilities/suppression-audit'
     },
     HEADERS: {
       'Content-Type': 'application/json',
@@ -91,7 +100,69 @@ const RiskScanner = (() => {
     }
   };
 
-  // Application State
+  // AI Settings
+  const AISettings = {
+    async load() {
+      try {
+        const settings = await API.request(API.ENDPOINTS.AI_SETTINGS, { method: 'GET' });
+        if (settings) {
+          State.settings.aiProvider = settings.provider || 'openai';
+          State.settings.aiModel = settings.model || 'gpt-4o-mini';
+          State.settings.aiEnabled = settings.configured || false;
+          UI.updateAIFields();
+        }
+        return settings;
+      } catch (error) {
+        console.log('No saved AI settings found or backend not ready');
+        return null;
+      }
+    },
+
+    async save() {
+      try {
+        const provider = DOM.get('aiProvider')?.value;
+        const model = DOM.get('aiModel')?.value;
+        const apiKey = DOM.get('aiApiKey')?.value;
+
+        if (!provider || !apiKey) {
+          UI.showAIStatus('Please provide both provider and API key', 'error');
+          return false;
+        }
+
+        const request = {
+          provider,
+          model: model || 'gpt-4o-mini',
+          apiKey
+        };
+
+        UI.showAIStatus('Saving settings...', 'info');
+        await API.request(API.ENDPOINTS.AI_SETTINGS, {
+          method: 'PUT',
+          body: JSON.stringify(request)
+        });
+
+        State.settings.aiProvider = provider;
+        State.settings.aiModel = model;
+        UI.showAIStatus('Settings saved successfully! API key is encrypted.', 'success');
+        return true;
+      } catch (error) {
+        UI.showAIStatus(`Failed to save: ${error.message}`, 'error');
+        return false;
+      }
+    },
+
+    async test() {
+      try {
+        UI.showAIStatus('Testing connection...', 'info');
+        await API.request(API.ENDPOINTS.AI_TEST, { method: 'POST' });
+        UI.showAIStatus('Connection successful! AI is ready to use.', 'success');
+        return true;
+      } catch (error) {
+        UI.showAIStatus(`Connection failed: ${error.message}`, 'error');
+        return false;
+      }
+    }
+  };
   const State = {
     isScanning: false,
     error: null,
@@ -189,6 +260,18 @@ const RiskScanner = (() => {
         this.updateUI();
       });
       
+      // AI Settings buttons
+      DOM.on(DOM.get('saveAISettings'), 'click', () => AISettings.save());
+      DOM.on(DOM.get('testAIConnection'), 'click', () => AISettings.test());
+      
+      // AI field changes
+      const aiProvider = DOM.get('aiProvider');
+      const aiModel = DOM.get('aiModel');
+      const aiApiKey = DOM.get('aiApiKey');
+      if (aiProvider) DOM.on(aiProvider, 'change', () => this.onAIFieldChange());
+      if (aiModel) DOM.on(aiModel, 'input', () => this.onAIFieldChange());
+      if (aiApiKey) DOM.on(aiApiKey, 'input', () => this.onAIFieldChange());
+      
       // Analyze button
       DOM.on(DOM.get('analyzeDependencies'), 'click', () => Scanner.startScan());
       
@@ -206,8 +289,16 @@ const RiskScanner = (() => {
         DOM.on(searchInput, 'input', (e) => State.setFilter('search', e.target.value));
       }
       
-      // Export button
-      DOM.on(DOM.get('exportResults'), 'click', () => this.exportToCSV());
+      // Export buttons
+      DOM.on(DOM.get('exportCSV'), 'click', () => this.exportToCSV());
+      DOM.on(DOM.get('exportJSON'), 'click', () => Exporter.exportJSON());
+      DOM.on(DOM.get('exportPDF'), 'click', () => Exporter.exportPDF());
+      
+      // Suppression management
+      DOM.on(DOM.get('manageSuppressions'), 'click', () => SuppressionUI.showManager());
+      
+      // Single dependency analysis
+      DOM.on(DOM.get('analyzeSingleDep'), 'click', () => SingleDepAnalyzer.analyze());
       
       // Keyboard shortcuts
       DOM.on(document, 'keydown', (e) => this.handleKeyboard(e));
@@ -257,6 +348,39 @@ const RiskScanner = (() => {
       this.updateBuildFilePlaceholder();
     },
     
+    updateAIFields() {
+      const { aiProvider, aiModel, aiEnabled } = State.settings;
+      const providerEl = DOM.get('aiProvider');
+      const modelEl = DOM.get('aiModel');
+      
+      if (providerEl) providerEl.value = aiProvider || 'openai';
+      if (modelEl) modelEl.value = aiModel || 'gpt-4o-mini';
+      
+      const enableCheckbox = DOM.get('enableAI');
+      if (enableCheckbox) enableCheckbox.checked = aiEnabled || false;
+    },
+
+    onAIFieldChange() {
+      // Clear saved status when fields change
+      UI.showAIStatus('Unsaved changes - click Save Settings to persist', 'warning');
+    },
+
+    showAIStatus(message, type = 'info') {
+      const statusEl = DOM.get('aiStatus');
+      if (!statusEl) return;
+      
+      statusEl.textContent = message;
+      statusEl.className = 'helper ai-status ai-status--' + type;
+      
+      if (type === 'success') {
+        setTimeout(() => {
+          if (statusEl.textContent === message) {
+            statusEl.textContent = '';
+          }
+        }, 5000);
+      }
+    },
+
     updateBuildFilePlaceholder() {
       const ta = DOM.get('buildFileContent');
       if (!ta) return;
@@ -846,12 +970,308 @@ const RiskScanner = (() => {
       });
     }
   };
+
+  // Exporter Service
+  const Exporter = {
+    async exportJSON() {
+      const projectPath = DOM.get('buildFileContent')?.value.trim();
+      if (!projectPath) {
+        UI.showError('Please enter a project path first');
+        return;
+      }
+
+      try {
+        UI.showLoading(true, 'Generating JSON report...');
+        
+        const response = await fetch(`${API.BASE_URL}${API.ENDPOINTS.EXPORT_JSON}`, {
+          method: 'POST',
+          headers: API.HEADERS,
+          body: JSON.stringify({ projectPath, forceRefresh: false })
+        });
+
+        if (!response.ok) throw new Error('Export failed');
+
+        const blob = await response.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `risk-report-${new Date().toISOString().slice(0,10)}.json`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        
+      } catch (error) {
+        UI.showError(`Export failed: ${error.message}`);
+      } finally {
+        UI.showLoading(false);
+      }
+    },
+
+    async exportPDF() {
+      const projectPath = DOM.get('buildFileContent')?.value.trim();
+      if (!projectPath) {
+        UI.showError('Please enter a project path first');
+        return;
+      }
+
+      try {
+        UI.showLoading(true, 'Generating PDF report...');
+        
+        const response = await fetch(`${API.BASE_URL}${API.ENDPOINTS.EXPORT_PDF}`, {
+          method: 'POST',
+          headers: API.HEADERS,
+          body: JSON.stringify({ projectPath, forceRefresh: false })
+        });
+
+        if (!response.ok) throw new Error('Export failed');
+
+        const blob = await response.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `risk-report-${new Date().toISOString().slice(0,10)}.pdf`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        
+      } catch (error) {
+        UI.showError(`Export failed: ${error.message}`);
+      } finally {
+        UI.showLoading(false);
+      }
+    }
+  };
+
+  // Single Dependency Analyzer
+  const SingleDepAnalyzer = {
+    async analyze() {
+      if (State.isScanning) return;
+
+      const groupId = DOM.get('singleGroupId')?.value.trim();
+      const artifactId = DOM.get('singleArtifactId')?.value.trim();
+      const version = DOM.get('singleVersion')?.value.trim();
+
+      if (!groupId || !artifactId || !version) {
+        UI.showError('Please provide Group ID, Artifact ID, and Version');
+        return;
+      }
+
+      try {
+        State.setScanning(true);
+        UI.showLoading(true, `Analyzing ${groupId}:${artifactId}:${version}...`);
+        UI.clearResults();
+
+        const params = new URLSearchParams({
+          groupId,
+          artifactId,
+          version,
+          buildTool: State.settings.buildTool,
+          includeExplanations: 'true'
+        });
+
+        const response = await API.request(`${API.ENDPOINTS.VULN_ANALYZE}?${params}`, {
+          method: 'GET'
+        });
+
+        if (!response || !response.findings || response.findings.length === 0) {
+          UI.showError('No vulnerabilities found for this dependency.');
+          // Show as clean finding
+          const cleanFinding = [{
+            _id: 'single-dep',
+            dependency: `${groupId}:${artifactId}:${version}`,
+            severity: 'LOW',
+            id: `${groupId}:${artifactId}`,
+            confidence: State.settings.buildTool === 'gradle' ? 'MEDIUM' : 'HIGH',
+            directness: 'direct',
+            source: 'Single Analysis',
+            description: 'No known vulnerabilities found for this version.',
+            affectedVersions: version,
+            dependencyPath: `${groupId}:${artifactId}:${version}`,
+            explanationType: 'static',
+            explanationText: 'This dependency version appears to have no known vulnerabilities in the scanned databases.',
+            fromCache: false,
+            analyzedAt: new Date().toISOString(),
+            vulnerabilityCount: 0,
+            riskScore: 0,
+            buildTool: State.settings.buildTool
+          }];
+          State.setFindings(cleanFinding);
+        } else {
+          // Convert to findings format
+          const findings = response.findings.map((f, idx) => ({
+            _id: `single-vuln-${idx}`,
+            dependency: `${groupId}:${artifactId}:${version}`,
+            severity: f.rawSeverity?.toUpperCase() || 'HIGH',
+            id: f.id || f.vulnerability?.id || `${groupId}:${artifactId}`,
+            confidence: f.confidenceLevel || 'HIGH',
+            directness: 'direct',
+            source: f.sources?.join(', ') || 'Analysis',
+            description: f.vulnerability?.description || 'Vulnerability found',
+            affectedVersions: f.vulnerability?.affectedVersions?.join(', ') || version,
+            dependencyPath: `${groupId}:${artifactId}:${version}`,
+            explanationType: 'ai',
+            explanationText: response.explanations?.[f.id]?.explanation || f.vulnerability?.description || 'See vulnerability details',
+            fromCache: false,
+            analyzedAt: new Date().toISOString(),
+            vulnerabilityCount: 1,
+            riskScore: f.riskScore || 50,
+            buildTool: State.settings.buildTool,
+            _vulnerabilityFinding: f // Keep reference for suppression
+          }));
+          State.setFindings(findings);
+        }
+        
+      } catch (error) {
+        State.setError(error);
+      } finally {
+        State.setScanning(false);
+        UI.showLoading(false);
+      }
+    }
+  };
+
+  // Suppression UI
+  const SuppressionUI = {
+    async showManager() {
+      try {
+        const [activeResponse, auditResponse] = await Promise.all([
+          API.request(API.ENDPOINTS.VULN_SUPPRESSIONS, { method: 'GET' }).catch(() => []),
+          API.request(API.ENDPOINTS.VULN_AUDIT, { method: 'GET' }).catch(() => [])
+        ]);
+
+        const activeSuppressions = Array.isArray(activeResponse) ? activeResponse : [];
+        const auditLog = Array.isArray(auditResponse) ? auditResponse : [];
+
+        this.renderModal(activeSuppressions, auditLog);
+      } catch (error) {
+        UI.showError('Failed to load suppression data');
+      }
+    },
+
+    renderModal(active, audit) {
+      const modal = document.createElement('div');
+      modal.className = 'modal';
+      modal.innerHTML = `
+        <div class="modal__backdrop" data-close="true"></div>
+        <div class="modal__panel" style="max-width: 800px;">
+          <div class="modal__header">
+            <div class="modal__title-wrap">
+              <div class="modal__title">Suppression Management</div>
+              <div class="modal__subtitle">${active.length} active suppressions</div>
+            </div>
+            <button class="btn btn--ghost" type="button" id="closeSuppressionModal">Close</button>
+          </div>
+          <div class="modal__body">
+            <section class="details-section">
+              <h4 class="details-section__title">Active Suppressions</h4>
+              ${active.length === 0 ? 
+                '<p class="muted">No active suppressions</p>' :
+                `<div class="table-wrap">
+                  <table class="table">
+                    <thead>
+                      <tr><th>Finding ID</th><th>Dependency</th><th>Reason</th><th>By</th><th>Action</th></tr>
+                    </thead>
+                    <tbody>
+                      ${active.map(s => `
+                        <tr>
+                          <td class="mono">${s.findingId || s.id || '--'}</td>
+                          <td>${s.dependency || '--'}</td>
+                          <td>${s.reason || '--'}</td>
+                          <td>${s.suppressedBy || '--'}</td>
+                          <td><button class="btn btn--link unsuppress-btn" data-id="${s.findingId || s.id}" data-dep="${s.dependency}">Unsuppress</button></td>
+                        </tr>
+                      `).join('')}
+                    </tbody>
+                  </table>
+                </div>`
+              }
+            </section>
+            <section class="details-section">
+              <h4 class="details-section__title">Recent Audit Log (last 10)</h4>
+              ${audit.length === 0 ?
+                '<p class="muted">No audit entries</p>' :
+                `<ul class="recommendations-list">
+                  ${audit.slice(-10).reverse().map(a => `
+                    <li><strong>${a.action || 'Unknown'}</strong> - ${a.findingId || '--'} by ${a.by || 'unknown'} at ${new Date(a.timestamp).toLocaleString()}</li>
+                  `).join('')}
+                </ul>`
+              }
+            </section>
+          </div>
+        </div>
+      `;
+
+      document.body.appendChild(modal);
+      DOM.show(modal);
+
+      // Close handler
+      DOM.on(DOM.get('closeSuppressionModal'), 'click', () => {
+        modal.remove();
+      });
+
+      // Backdrop click
+      DOM.on(modal.querySelector('.modal__backdrop'), 'click', () => {
+        modal.remove();
+      });
+
+      // Unsuppress handlers
+      modal.querySelectorAll('.unsuppress-btn').forEach(btn => {
+        DOM.on(btn, 'click', async () => {
+          const findingId = btn.dataset.id;
+          const dependency = btn.dataset.dep;
+          if (findingId && confirm('Unsuppress this vulnerability?')) {
+            await this.unsuppress(findingId, dependency);
+            modal.remove();
+            this.showManager();
+          }
+        });
+      });
+    },
+
+    async unsuppress(findingId, dependency) {
+      try {
+        await API.request(`${API.ENDPOINTS.VULN_UNSUPPRESS}?findingId=${encodeURIComponent(findingId)}`, {
+          method: 'POST',
+          body: JSON.stringify({ dependency, unsuppressedBy: 'user' })
+        });
+        UI.showError('Vulnerability unsuppressed successfully');
+      } catch (error) {
+        UI.showError(`Failed to unsuppress: ${error.message}`);
+      }
+    },
+
+    async suppress(finding) {
+      const reason = prompt('Enter reason for suppressing this finding:');
+      if (!reason) return;
+
+      try {
+        await API.request(API.ENDPOINTS.VULN_SUPPRESS, {
+          method: 'POST',
+          body: JSON.stringify({
+            findingId: finding.id,
+            dependency: finding.dependency,
+            reason,
+            suppressedBy: 'user',
+            justification: reason
+          })
+        });
+        UI.showError('Finding suppressed successfully');
+      } catch (error) {
+        UI.showError(`Failed to suppress: ${error.message}`);
+      }
+    }
+  };
   
   // Initialize the application
   return {
     init() {
       // Load saved settings
       State.loadSettings();
+      
+      // Load AI settings from backend
+      AISettings.load().catch(() => null);
       
       // Initialize UI
       UI.init();
