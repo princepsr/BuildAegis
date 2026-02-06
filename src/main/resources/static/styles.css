@@ -142,6 +142,11 @@ body{
   color:var(--text);
   outline:none;
 }
+.form-select option {
+  background:rgba(15,23,34,.95);
+  color:var(--text);
+  padding:8px;
+}
 .form-input:focus,.form-select:focus{border-color:rgba(77,163,255,.7); box-shadow:0 0 0 3px rgba(77,163,255,.14)}
 
 .form-textarea{
@@ -250,7 +255,7 @@ body{
   border:1px solid var(--border);
   background:rgba(15,23,34,.55);
   color:var(--muted);
-  cursor:help;
+  cursor:pointer;
 }
 .tooltip:hover{border-color:rgba(77,163,255,.45); color:var(--text)}
 .tooltip:focus{outline:none; box-shadow:0 0 0 3px rgba(77,163,255,.14)}
@@ -295,7 +300,7 @@ body{
 }
 .badge--confidence{
   position:relative;
-  cursor:help;
+  cursor:default;
 }
 .badge--confidence::after{
   content:attr(data-tooltip);
@@ -766,6 +771,7 @@ body{
 }
 .btn--ghost{
   background:transparent;
+  cursor:pointer;
 }
 
 .summary-grid{
@@ -783,7 +789,29 @@ body{
 .summary-tile__k{font-size:11px; color:var(--muted);}
 .summary-tile__v{font-size:18px; margin-top:4px; font-family:var(--mono)}
 
-.table-wrap{overflow:auto; border-radius:10px; border:1px solid var(--border);}
+.table-wrap{
+  overflow:auto; 
+  border-radius:10px; 
+  border:1px solid var(--border);
+  scrollbar-width: thin;
+  scrollbar-color: rgba(77,163,255,.3) rgba(15,23,34,.2);
+}
+.table-wrap::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+.table-wrap::-webkit-scrollbar-track {
+  background: rgba(15,23,34,.2);
+  border-radius: 4px;
+}
+.table-wrap::-webkit-scrollbar-thumb {
+  background: rgba(77,163,255,.3);
+  border-radius: 4px;
+  border: 1px solid rgba(15,23,34,.1);
+}
+.table-wrap::-webkit-scrollbar-thumb:hover {
+  background: rgba(77,163,255,.5);
+}
 .table{width:100%; border-collapse:collapse; min-width:680px; background:rgba(15,23,34,.35)}
 .table th,.table td{padding:10px 10px; border-bottom:1px solid var(--border); vertical-align:top; font-size:13px;}
 .table th{position:sticky; top:0; background:rgba(15,23,34,.9); text-align:left; font-size:12px; color:var(--muted);}
@@ -935,6 +963,7 @@ body{
 }
 
 /* KPI card tooltips */
+.kpi[data-tooltip]{overflow:visible;}
 .kpi[data-tooltip]::before{
   bottom:auto;
   top:100%;

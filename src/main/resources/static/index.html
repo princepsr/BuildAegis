@@ -52,12 +52,6 @@
                 <textarea class="form-textarea" id="buildFileContent" name="buildFileContent" rows="2" spellcheck="false" autocomplete="off" placeholder=""></textarea>
               </div>
 
-              <div class="meta-row" aria-label="Project path input metadata">
-                <div class="meta-row__left">
-                  <span class="meta" id="buildFileCharCount">0 characters</span>
-                </div>
-              </div>
-
               <div class="form-actions">
                 <button type="button" id="analyzeDependencies" class="btn btn--primary">
                   <span class="btn__icon">🔍</span>
@@ -66,10 +60,6 @@
                 <button type="button" id="loadCachedResults" class="btn btn--ghost">
                   <span class="btn__icon">📂</span>
                   <span>Load Cached</span>
-                </button>
-                <button type="button" id="clearBuildFile" class="btn btn--ghost" style="margin-left: 8px;">
-                  <span class="btn__icon">🗑️</span>
-                  <span>Clear</span>
                 </button>
               </div>
 
@@ -260,7 +250,7 @@
                     <div class="kpi__k">Low</div>
                     <div class="kpi__v mono" id="kpiLow">--</div>
                   </div>
-                  <div class="kpi kpi--neutral" aria-label="Overall risk score" data-tooltip="Risk score for current view: Critical=40pts each + boost. 1 Critical min 40, 2 Critical min 60, 3+ Critical min 90. Scale 0-100.">
+                  <div class="kpi kpi--neutral" aria-label="Overall risk score" data-tooltip="Risk score (0-100): Higher means more critical vulnerabilities found. Based on severity counts.">
                     <div class="kpi__k">Overall risk score</div>
                     <div class="kpi__v mono" id="kpiOverallRisk">--</div>
                   </div>
@@ -359,7 +349,7 @@
                     <span>📄 Export JSON</span>
                   </button>
                   <button type="button" id="exportPDF" class="btn btn--ghost" title="Export PDF report">
-                    <span>� Export PDF</span>
+                    <span>📄 Export PDF</span>
                   </button>
                   <button type="button" id="manageSuppressions" class="btn btn--ghost" title="View and manage suppressed vulnerabilities">
                     <span>🚫 Suppressions</span>

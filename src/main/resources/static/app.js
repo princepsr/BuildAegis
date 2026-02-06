@@ -307,19 +307,9 @@ const BuildAegis = (() => {
       const ta = DOM.get('buildFileContent');
       if (ta) {
         DOM.on(ta, 'input', () => {
-          this.updateCharCount();
           this.updateAnalyzeButton();
         });
       }
-      
-      // Clear button
-      DOM.on(DOM.get('clearBuildFile'), 'click', () => {
-        const ta = DOM.get('buildFileContent');
-        if (ta) {
-          ta.value = '';
-          ta.dispatchEvent(new Event('input'));
-        }
-      });
       
       // Modal close
       DOM.on(DOM.get('closeDetails'), 'click', () => DOM.hide(DOM.get('detailsModal')));
@@ -389,15 +379,6 @@ const BuildAegis = (() => {
       if (!ta) return;
 
       ta.placeholder = "e.g. C:/path/to/project OR C:/path/to/project/pom.xml";
-    },
-    
-    updateCharCount() {
-      const ta = DOM.get('buildFileContent');
-      const countEl = DOM.get('buildFileCharCount');
-      if (!ta || !countEl) return;
-      
-      const len = ta.value.length;
-      DOM.setText(countEl, `${len} ${len === 1 ? 'character' : 'characters'}`);
     },
     
     updateAnalyzeButton() {
@@ -1203,6 +1184,31 @@ const BuildAegis = (() => {
         }
         
       } catch (error) {
+        // Show fallback data when AI fails
+        const fallbackFinding = [{
+          _id: 'single-dep',
+          dependency: `${groupId}:${artifactId}:${version}`,
+          severity: 'LOW',
+          id: `${groupId}:${artifactId}`,
+          confidence: State.settings.buildTool === 'gradle' ? 'MEDIUM' : 'HIGH',
+          directness: 'direct',
+          source: 'Single Analysis',
+          description: 'AI analysis failed - showing basic vulnerability data.',
+          affectedVersions: version,
+          dependencyPath: `${groupId}:${artifactId}:${version}`,
+          explanationType: 'static',
+          explanationText: 'AI analysis failed. This dependency version appears to have no known vulnerabilities in scanned databases.',
+          fromCache: false,
+          analyzedAt: new Date().toISOString(),
+          vulnerabilityCount: 0,
+          riskScore: 0,
+          buildTool: State.settings.buildTool
+        }];
+        State.setFindings(fallbackFinding);
+        
+        // Show error message about AI failure
+        UI.showError(`AI analysis failed: ${error.message}. Showing basic vulnerability data instead.`);
+        
         State.setError(error);
       } finally {
         State.setScanning(false);
@@ -1357,7 +1363,6 @@ const BuildAegis = (() => {
       
       // Set initial UI state
       UI.updateUI();
-      UI.updateCharCount();
       UI.updateAnalyzeButton();
       
       // Show welcome message
