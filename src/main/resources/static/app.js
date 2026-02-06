@@ -100,6 +100,56 @@ const BuildAegis = (() => {
     }
   };
 
+  const Theme = {
+    STORAGE_KEY: 'buildaegis.theme',
+    getSystemTheme() {
+      return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+    },
+    getStoredTheme() {
+      try {
+        return localStorage.getItem(this.STORAGE_KEY);
+      } catch {
+        return null;
+      }
+    },
+    storeTheme(theme) {
+      try {
+        localStorage.setItem(this.STORAGE_KEY, theme);
+      } catch {
+        return;
+      }
+    },
+    apply(theme) {
+      const root = document.documentElement;
+      if (theme === 'light') root.setAttribute('data-theme', 'light');
+      else root.removeAttribute('data-theme');
+      this.updateToggleText();
+    },
+    current() {
+      return document.documentElement.getAttribute('data-theme') === 'light' ? 'light' : 'dark';
+    },
+    toggle() {
+      const next = this.current() === 'dark' ? 'light' : 'dark';
+      this.apply(next);
+      this.storeTheme(next);
+    },
+    updateToggleText() {
+      const btn = document.getElementById('themeToggle');
+      if (!btn) return;
+      const theme = this.current();
+      btn.textContent = theme === 'dark' ? 'Light' : 'Dark';
+      btn.setAttribute('aria-label', theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme');
+    },
+    init() {
+      const stored = this.getStoredTheme();
+      const theme = stored || this.getSystemTheme();
+      this.apply(theme);
+
+      const btn = document.getElementById('themeToggle');
+      if (btn) btn.addEventListener('click', () => this.toggle());
+    }
+  };
+
   // AI Settings
   const AISettings = {
     async load() {
@@ -1356,8 +1406,10 @@ const BuildAegis = (() => {
     init() {
       // Load saved settings
       State.loadSettings();
+
+      Theme.init();
       
-      // Load AI settings from backend
+      // Load AI settings
       AISettings.load().catch(() => null);
       
       // Initialize UI
