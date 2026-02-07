@@ -21,18 +21,14 @@ Runs a full analysis pipeline for a project path.
 {
   "projectPath": "C:\\path\\to\\project",
   "forceRefresh": false,
-  "ai": {
-    "enabled": false,
-    "provider": "openai",
-    "apiKey": "...",
-    "model": "gpt-4o-mini"
-  }
+  "aiEnabled": false
 }
 ```
 
 Notes:
 - Actual request shape can differ depending on current backend DTOs.
 - The UI primarily sends project path and scan settings.
+- When `aiEnabled` is `false` (or omitted), the backend will not call any AI provider APIs.
 
 **Response (typical):**
 ```json

@@ -36,15 +36,20 @@ public class AiSettingsService {
     @Transactional(readOnly = true)
     public AiSettingsResponse getSettings() {
         return aiSettingsRepository.findById(SETTINGS_ID)
-                .map(entity -> new AiSettingsResponse(
-                        entity.getProvider(),
-                        entity.getModel(),
-                        entity.getCustomEndpoint(),
-                        true,
-                        entity.getUpdatedAt()))
+                .map(entity -> {
+                    String apiKey = cryptoService.decrypt(entity.getApiKeyCiphertext(), entity.isEncrypted());
+                    return new AiSettingsResponse(
+                            entity.getProvider(),
+                            entity.getModel(),
+                            entity.getCustomEndpoint(),
+                            apiKey,
+                            true,
+                            entity.getUpdatedAt());
+                })
                 .orElseGet(() -> new AiSettingsResponse(
                         "openai",
                         "gpt-4o",
+                        null,
                         null,
                         false,
                         null));
@@ -81,7 +86,7 @@ public class AiSettingsService {
 
         aiSettingsRepository.save(entity);
 
-        return new AiSettingsResponse(entity.getProvider(), entity.getModel(), entity.getCustomEndpoint(), true, entity.getUpdatedAt());
+        return new AiSettingsResponse(entity.getProvider(), entity.getModel(), entity.getCustomEndpoint(), request.apiKey(), true, entity.getUpdatedAt());
     }
 
     @Transactional(readOnly = true)

@@ -6,6 +6,7 @@ public record AiSettingsResponse(
         String provider,
         String model,
         String customEndpoint,
+        String apiKey,
         boolean configured,
         Instant updatedAt
 ) {

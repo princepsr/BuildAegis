@@ -12,6 +12,9 @@ import com.riskscanner.dependencyriskanalyzer.repository.DependencyRiskCacheRepo
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.riskscanner.dependencyriskanalyzer.service.ai.FallbackExplanationService;
+import com.riskscanner.dependencyriskanalyzer.service.ai.DeterministicRiskCalculator;
+
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -44,6 +47,8 @@ public class ProjectAnalysisService {
     private final DependencyRiskCacheRepository cacheRepository;
     private final MetadataEnrichmentService metadataEnrichmentService;
     private final ObjectMapper objectMapper;
+    private final DeterministicRiskCalculator riskCalculator;
+    private final FallbackExplanationService fallbackExplanationService;
 
     public ProjectAnalysisService(
             DependencyScannerService dependencyScannerService,
@@ -51,7 +56,9 @@ public class ProjectAnalysisService {
             AiSettingsService aiSettingsService,
             DependencyRiskCacheRepository cacheRepository,
             MetadataEnrichmentService metadataEnrichmentService,
-            ObjectMapper objectMapper
+            ObjectMapper objectMapper,
+            DeterministicRiskCalculator riskCalculator,
+            FallbackExplanationService fallbackExplanationService
     ) {
         this.dependencyScannerService = dependencyScannerService;
         this.aiAnalysisService = aiAnalysisService;
@@ -59,6 +66,8 @@ public class ProjectAnalysisService {
         this.cacheRepository = cacheRepository;
         this.metadataEnrichmentService = metadataEnrichmentService;
         this.objectMapper = objectMapper;
+        this.riskCalculator = riskCalculator;
+        this.fallbackExplanationService = fallbackExplanationService;
     }
 
     /**
@@ -74,8 +83,9 @@ public class ProjectAnalysisService {
         }
 
         boolean forceRefresh = request.forceRefresh();
-        String provider = aiSettingsService.getProvider();
-        String model = aiSettingsService.getModel();
+        boolean aiEnabled = Boolean.TRUE.equals(request.aiEnabled());
+        String provider = aiEnabled ? aiSettingsService.getProvider() : "disabled";
+        String model = aiEnabled ? aiSettingsService.getModel() : "disabled";
 
         List<DependencyCoordinate> scanned = dependencyScannerService.scanProject(request.projectPath());
 
@@ -123,7 +133,25 @@ public class ProjectAnalysisService {
             }
 
             DependencyEnrichmentDto enrichment = metadataEnrichmentService.enrich(dependency);
-            AIAnalysisService.DependencyRiskAnalysisResult analysis = aiAnalysisService.analyzeDependencyRisk(dependency, enrichment);
+
+            AIAnalysisService.DependencyRiskAnalysisResult analysis;
+            if (aiEnabled) {
+                analysis = aiAnalysisService.analyzeDependencyRisk(dependency, enrichment);
+            } else {
+                DeterministicRiskCalculator.RiskResult riskResult = riskCalculator.calculateRisk(dependency, enrichment);
+                var fallback = fallbackExplanationService.explainRisk(
+                        dependency,
+                        enrichment,
+                        riskResult.riskLevel().name(),
+                        riskResult.riskScore()
+                );
+                analysis = new AIAnalysisService.DependencyRiskAnalysisResult(
+                        riskResult.riskLevel(),
+                        riskResult.riskScore(),
+                        fallback.explanation(),
+                        fallback.recommendations()
+                );
+            }
 
             DependencyRiskCacheEntity entity = cached == null ? new DependencyRiskCacheEntity() : cached;
             entity.setGroupId(dependency.groupId());

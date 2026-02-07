@@ -158,8 +158,8 @@ const BuildAegis = (() => {
         if (settings) {
           State.settings.aiProvider = settings.provider || 'openai';
           State.settings.aiModel = settings.model || 'gpt-4o-mini';
-          State.settings.aiEnabled = settings.configured || false;
           State.settings.customEndpoint = settings.customEndpoint || null;
+          State.settings.aiApiKey = settings.apiKey || null;
           UI.updateAIFields();
         }
         return settings;
@@ -310,8 +310,16 @@ const BuildAegis = (() => {
       });
       
       // AI toggle
-      DOM.on(DOM.get('enableAI'), 'change', (e) => {
-        State.updateSettings({ aiEnabled: e.target.checked });
+      DOM.on(DOM.get('enableAI'), 'change', async (e) => {
+        const enabled = !!e.target.checked;
+        State.updateSettings({ aiEnabled: enabled });
+
+        // When enabling AI, auto-load saved provider/model/customEndpoint from DB
+        // so the user doesn't have to re-enter them.
+        if (enabled) {
+          await AISettings.load();
+        }
+
         this.updateUI();
       });
       
@@ -402,14 +410,16 @@ const BuildAegis = (() => {
     },
     
     updateAIFields() {
-      const { aiProvider, aiModel, aiEnabled, customEndpoint } = State.settings;
+      const { aiProvider, aiModel, aiEnabled, customEndpoint, aiApiKey } = State.settings;
       const providerEl = DOM.get('aiProvider');
       const modelEl = DOM.get('aiModel');
+      const apiKeyEl = DOM.get('aiApiKey');
       const customEndpointEl = DOM.get('customEndpoint');
       const customEndpointRow = DOM.get('customEndpointRow');
       
       if (providerEl) providerEl.value = aiProvider || 'openai';
       if (modelEl) modelEl.value = aiModel || 'gpt-4o-mini';
+      if (apiKeyEl) apiKeyEl.value = aiApiKey || '';
       if (customEndpointEl) customEndpointEl.value = customEndpoint || '';
       
       // Show/hide custom endpoint field based on provider
@@ -1016,7 +1026,7 @@ const BuildAegis = (() => {
 
         const response = await API.request(API.ENDPOINTS.PROJECT_ANALYZE, {
           method: 'POST',
-          body: JSON.stringify({ projectPath, forceRefresh: true })
+          body: JSON.stringify({ projectPath, forceRefresh: true, aiEnabled: State.settings.aiEnabled })
         });
 
         const findings = this.mapProjectResultsToFindings(response?.results || []);
