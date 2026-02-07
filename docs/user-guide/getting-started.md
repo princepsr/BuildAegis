@@ -165,15 +165,34 @@ When enabled, AI provides:
 ### Gradle Projects
 
 - **Confidence**: MEDIUM - Parses build file output (best-effort)
-- **Note**: Some false positives may occur due to dynamic resolution
+- **Multi-project support**: Automatically detects and analyzes all subprojects
+- **Intelligent filtering**: Skips Node.js, documentation, test, and build/utility projects
+- **Subproject analysis**: Can analyze specific subprojects with parent dependency context
+- **Performance**: Optimized for large multi-project builds
 - **Requirements**: `build.gradle` or `build.gradle.kts` in project directory
 
 ### Multi-Module Projects
 
-Point to the **parent project directory**. The tool will:
-- Detect the build file type
+**For Maven:**
+- Point to **parent project directory**. The tool will:
+- Detect build file type
 - Attempt to analyze all modules
-- Aggregate findings across the project
+- Aggregate findings across project
+
+**For Gradle:**
+- **Root analysis**: Point to parent directory to analyze all relevant subprojects
+- **Subproject analysis**: Point to specific subproject directory for focused analysis
+- **Performance optimization**: Use `-Dgradle.skip.subprojects=true` to skip subproject analysis
+- **Automatic filtering**: Skips Node.js, docs, tests, and build utilities automatically
+
+**Gradle Project Types Analyzed:**
+- Java applications and libraries
+- Web applications (Spring Boot, etc.)
+- Feature modules and shared libraries
+- Node.js/React projects (skipped automatically)
+- Documentation projects (skipped automatically)
+- Test-only projects (skipped automatically)
+- Build/utility projects (skipped automatically)
 
 ## Next Steps
 

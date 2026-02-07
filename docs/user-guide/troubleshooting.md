@@ -56,6 +56,52 @@ ls /path/to/project/build.gradle.kts
 - Consider using Maven for critical security audits
 - Run `./gradlew dependencies` separately and compare
 
+#### Multi-project Gradle analysis is very slow
+**Symptoms**: Analysis of large Gradle multi-project builds takes 5+ minutes
+
+**Explanation**: Large multi-project builds with many subprojects can be slow due to:
+- Each subproject requiring separate Gradle execution
+- Node.js projects downloading Node.js and npm packages
+- Test projects running test frameworks
+
+**Solutions**:
+1. **Use subproject analysis**: Point to specific subproject instead of root
+2. **Enable fast mode**: Start with `-Dgradle.skip.subprojects=true`
+3. **Check what's being analyzed**: Look for "Skipping X project" logs
+4. **Analyze relevant subprojects only**: Focus on Java projects, not Node.js/tests
+
+**Example Fast Mode**:
+```bash
+# Skip all subproject analysis (root only)
+./mvnw spring-boot:run -Dgradle.skip.subprojects=true
+
+# Then analyze specific subproject in UI
+# Use path: C:\Users\PrinceSingh\Sciforma\IntelliJ\sciforma-webapp
+```
+
+#### Gradle subproject not found
+**Symptoms**: "Failed to analyze subproject" or "No dependencies found"
+
+**Possible Causes**:
+1. Subproject path is incorrect
+2. Subproject is being automatically skipped (Node.js, test, docs)
+3. Parent project doesn't have settings.gradle
+
+**Solutions**:
+1. **Verify subproject exists**:
+   ```bash
+   ls -la /path/to/project/subproject-name
+   ```
+2. **Check if it's being skipped**: Look for logs like "Skipping X project"
+3. **Use root analysis**: Point to parent directory instead
+4. **Check settings.gradle**: Ensure subproject is properly included
+
+**Common Skipped Projects**:
+- `apps/react-*` (Node.js projects)
+- `docs/*` (documentation)
+- `tests/*` (test projects)
+- `build-tools` (build utilities)
+
 ### AI Issues
 
 #### "AI settings are not configured"

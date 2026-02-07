@@ -68,6 +68,28 @@ Key endpoints:
 
 - Detects build tool (Maven/Gradle) by scanning for build files.
 - Returns `DependencyCoordinate` objects used downstream.
+- Supports multi-project Gradle builds with intelligent project filtering.
+
+### `GradleExecutionDependencyResolver`
+**Responsibility:** Gradle dependency resolution with multi-project support.
+
+**Key Features:**
+- **Multi-project detection**: Automatically discovers subprojects via `gradle projects`
+- **Intelligent filtering**: Skips Node.js, documentation, test, and build/utility projects
+- **Subproject analysis**: Can analyze specific subprojects from root context
+- **Performance optimization**: Configurable subproject skipping via system properties
+
+**Project Types Detected & Skipped:**
+- Node.js projects (`package.json` + `node-gradle` plugin)
+- Documentation projects (Asciidoctor, "doc" in name)
+- Test projects ("test" in name + test-only dependencies)
+- Build/utility projects (no runtime dependencies)
+- Test-only libraries (`java-library` + only test deps)
+
+**Usage Modes:**
+- **Root analysis**: Analyzes all relevant subprojects
+- **Subproject analysis**: Analyzes specific subproject with parent context
+- **Fast mode**: Skip subprojects with `-Dgradle.skip.subprojects=true`
 
 ### `ProjectAnalysisService`
 **Responsibility:** orchestrates end-to-end analysis.
