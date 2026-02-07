@@ -14,11 +14,13 @@ import org.springframework.stereotype.Component;
  *   <li>claude</li>
  *   <li>ollama</li>
  *   <li>azure-openai</li>
+ *   <li>custom - Any OpenAI-compatible API endpoint</li>
  * </ul>
  *
  * <p>For Azure OpenAI, the API key must be the Azure key and the endpoint must be provided
  * via {@code buildaegis.ai.azure-openai.endpoint}. For Ollama, the base URL defaults to
  * {@code http://localhost:11434} and can be overridden via {@code buildaegis.ai.ollama.base-url}.
+ * For Custom provider, the endpoint must be provided via {@code buildaegis.ai.custom.endpoint}.
  */
 @Lazy
 @Component
@@ -55,6 +57,13 @@ public class AiClientFactory {
                     throw new IllegalArgumentException("Azure OpenAI endpoint must be configured via buildaegis.ai.azure-openai.endpoint");
                 }
                 yield new AzureOpenAiClient(apiKey, azureOpenAiEndpoint, model);
+            }
+            case "custom" -> {
+                String customEndpoint = aiSettingsService.getCustomEndpoint();
+                if (customEndpoint == null || customEndpoint.isBlank()) {
+                    throw new IllegalArgumentException("Custom AI endpoint must be configured");
+                }
+                yield new CustomAiClient(apiKey, customEndpoint, model);
             }
             default -> throw new IllegalArgumentException("Unsupported AI provider: " + provider);
         };

@@ -159,6 +159,7 @@ const BuildAegis = (() => {
           State.settings.aiProvider = settings.provider || 'openai';
           State.settings.aiModel = settings.model || 'gpt-4o-mini';
           State.settings.aiEnabled = settings.configured || false;
+          State.settings.customEndpoint = settings.customEndpoint || null;
           UI.updateAIFields();
         }
         return settings;
@@ -173,6 +174,7 @@ const BuildAegis = (() => {
         const provider = DOM.get('aiProvider')?.value;
         const model = DOM.get('aiModel')?.value;
         const apiKey = DOM.get('aiApiKey')?.value;
+        const customEndpoint = DOM.get('customEndpoint')?.value;
 
         if (!provider || !apiKey) {
           UI.showAIStatus('Please provide both provider and API key', 'error');
@@ -182,7 +184,8 @@ const BuildAegis = (() => {
         const request = {
           provider,
           model: model || 'gpt-4o-mini',
-          apiKey
+          apiKey,
+          customEndpoint: provider === 'custom' ? customEndpoint : null
         };
 
         UI.showAIStatus('Saving settings...', 'info');
@@ -193,6 +196,7 @@ const BuildAegis = (() => {
 
         State.settings.aiProvider = provider;
         State.settings.aiModel = model;
+        State.settings.customEndpoint = provider === 'custom' ? customEndpoint : null;
         UI.showAIStatus('Settings saved successfully! API key is encrypted.', 'success');
         return true;
       } catch (error) {
@@ -222,7 +226,8 @@ const BuildAegis = (() => {
       buildTool: 'maven',
       aiEnabled: false,
       aiProvider: null,
-      aiApiKey: null
+      aiApiKey: null,
+      customEndpoint: null
     },
     filters: {
       severity: 'all',
@@ -318,7 +323,10 @@ const BuildAegis = (() => {
       const aiProvider = DOM.get('aiProvider');
       const aiModel = DOM.get('aiModel');
       const aiApiKey = DOM.get('aiApiKey');
-      if (aiProvider) DOM.on(aiProvider, 'change', () => this.onAIFieldChange());
+      if (aiProvider) DOM.on(aiProvider, 'change', () => {
+        this.onProviderChange();
+        this.onAIFieldChange();
+      });
       if (aiModel) DOM.on(aiModel, 'input', () => this.onAIFieldChange());
       if (aiApiKey) DOM.on(aiApiKey, 'input', () => this.onAIFieldChange());
       
@@ -394,12 +402,20 @@ const BuildAegis = (() => {
     },
     
     updateAIFields() {
-      const { aiProvider, aiModel, aiEnabled } = State.settings;
+      const { aiProvider, aiModel, aiEnabled, customEndpoint } = State.settings;
       const providerEl = DOM.get('aiProvider');
       const modelEl = DOM.get('aiModel');
+      const customEndpointEl = DOM.get('customEndpoint');
+      const customEndpointRow = DOM.get('customEndpointRow');
       
       if (providerEl) providerEl.value = aiProvider || 'openai';
       if (modelEl) modelEl.value = aiModel || 'gpt-4o-mini';
+      if (customEndpointEl) customEndpointEl.value = customEndpoint || '';
+      
+      // Show/hide custom endpoint field based on provider
+      if (customEndpointRow) {
+        customEndpointRow.hidden = aiProvider !== 'custom';
+      }
       
       const enableCheckbox = DOM.get('enableAI');
       if (enableCheckbox) enableCheckbox.checked = aiEnabled || false;
@@ -408,6 +424,22 @@ const BuildAegis = (() => {
     onAIFieldChange() {
       // Clear saved status when fields change
       UI.showAIStatus('Unsaved changes - click Save Settings to persist', 'warning');
+    },
+
+    onProviderChange() {
+      const provider = DOM.get('aiProvider')?.value;
+      const customEndpointRow = DOM.get('customEndpointRow');
+      
+      // Show/hide custom endpoint field based on provider
+      if (customEndpointRow) {
+        customEndpointRow.hidden = provider !== 'custom';
+      }
+      
+      // Clear custom endpoint if not custom provider
+      if (provider !== 'custom') {
+        const customEndpointEl = DOM.get('customEndpoint');
+        if (customEndpointEl) customEndpointEl.value = '';
+      }
     },
 
     showAIStatus(message, type = 'info') {

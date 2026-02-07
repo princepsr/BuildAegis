@@ -176,6 +176,11 @@ public class DependencyEnrichmentDto {
 | Gemini | `generativelanguage.googleapis.com` | API key param |
 | Ollama | `localhost:11434/api/generate` | None (local) |
 | Azure | `{endpoint}/openai/deployments/{model}/chat/completions` | Bearer token |
+| Custom (OpenAI-compatible) | User-provided Chat Completions URL (e.g. `https://openrouter.ai/api/v1/chat/completions`) | Bearer token |
+
+Notes:
+- The Custom provider sends requests to the configured endpoint as-is using an OpenAI-compatible JSON payload.
+- Some OpenAI-compatible providers/models may return assistant text in non-standard fields (e.g. `message.reasoning` with empty `message.content`). The implementation handles this best-effort.
 
 **Analysis Prompt Template**:
 ```

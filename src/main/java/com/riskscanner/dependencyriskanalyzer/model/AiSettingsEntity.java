@@ -24,6 +24,9 @@ public class AiSettingsEntity {
     @Column(nullable = false)
     private String model;
 
+    @Column(name = "custom_endpoint")
+    private String customEndpoint;
+
     @Lob
     @Column(name = "api_key_ciphertext", nullable = false)
     private String apiKeyCiphertext;
@@ -56,6 +59,14 @@ public class AiSettingsEntity {
 
     public void setModel(String model) {
         this.model = model;
+    }
+
+    public String getCustomEndpoint() {
+        return customEndpoint;
+    }
+
+    public void setCustomEndpoint(String customEndpoint) {
+        this.customEndpoint = customEndpoint;
     }
 
     public String getApiKeyCiphertext() {

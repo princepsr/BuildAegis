@@ -84,13 +84,30 @@ Notes:
 
 Returns stored AI settings.
 
+Response fields include:
+- `provider`
+- `model`
+- `configured`
+- `updatedAt`
+- `customEndpoint` (only relevant when `provider` is `custom`)
+
 ### PUT `/api/ai/settings`
 
 Saves AI settings.
 
+Request fields:
+- `provider`
+- `model`
+- `apiKey`
+- `customEndpoint` (required when `provider` is `custom`)
+
 ### POST `/api/ai/test-connection`
 
 Attempts a minimal request to validate provider/model/apiKey.
+
+Notes:
+- For `provider=custom`, the backend uses the saved `customEndpoint`.
+- Success indicates the provider accepted the credentials and returned a valid response envelope; it does not require a specific response string.
 
 ## Export
 

@@ -152,7 +152,8 @@
                     <option value="claude">Claude</option>
                     <option value="gemini">Gemini</option>
                     <option value="ollama">Ollama</option>
-                    <option value="azure">Azure</option>
+                    <option value="azure-openai">Azure OpenAI</option>
+                    <option value="custom">Custom (OpenAI-compatible)</option>
                   </select>
                 </div>
 
@@ -164,6 +165,12 @@
                 <div class="form-row">
                   <label class="form-label" for="aiApiKey">API key</label>
                   <input class="form-input" id="aiApiKey" name="aiApiKey" type="password" placeholder="(stored encrypted if configured)" autocomplete="off">
+                </div>
+
+                <div class="form-row" id="customEndpointRow" hidden>
+                  <label class="form-label" for="customEndpoint">Custom endpoint</label>
+                  <input class="form-input" id="customEndpoint" name="customEndpoint" type="text" placeholder="e.g. https://api.example.com/v1" autocomplete="off">
+                  <p class="helper">For OpenAI-compatible APIs. Include the full base URL with version.</p>
                 </div>
                 
                 <div class="form-actions ai-actions">

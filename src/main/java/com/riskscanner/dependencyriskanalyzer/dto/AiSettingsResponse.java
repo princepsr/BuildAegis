@@ -5,6 +5,7 @@ import java.time.Instant;
 public record AiSettingsResponse(
         String provider,
         String model,
+        String customEndpoint,
         boolean configured,
         Instant updatedAt
 ) {

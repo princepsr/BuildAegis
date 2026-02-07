@@ -98,6 +98,7 @@ Confidence indicates reliability of vulnerability detection:
 - **Gemini**: Gemini Pro, Gemini 1.5 Pro
 - **Ollama**: Local models (Llama3, Mistral, etc.)
 - **Azure OpenAI**: Enterprise deployments
+- **Custom (OpenAI-compatible)**: Any provider that exposes an OpenAI-compatible Chat Completions API
 
 #### AI Configuration Persistence
 
@@ -107,8 +108,19 @@ The UI now supports saving AI settings to the backend:
 2. **Select Provider** - Choose from dropdown (OpenAI, Claude, etc.)
 3. **Enter Model** - Specify model name (e.g., "gpt-4o-mini")
 4. **Enter API Key** - Your provider API key
+5. **Enter Custom Endpoint (Custom provider only)** - Full Chat Completions URL for your provider
 5. **Save Settings** - Click "Save Settings" to persist (encrypted if configured)
 6. **Test Connection** - Click "Test Connection" to verify connectivity
+
+**Custom Provider Notes:**
+- The custom endpoint is sent as-is. For many providers this is the full URL, for example:
+  - `https://openrouter.ai/api/v1/chat/completions`
+- The model field must match the provider’s model identifier (e.g., `openai/gpt-oss-120b:free`).
+- Some OpenAI-compatible providers may return the assistant text in a non-standard field (e.g., `message.reasoning`). BuildAegis handles this best-effort.
+
+**Test Connection Behavior:**
+- "Test Connection" validates that the provider accepts the credentials + model + endpoint and returns a valid response envelope.
+- It does not require a specific response string (some models/providers may return empty `message.content` or reasoning-only output).
 
 **Security Notes:**
 - API keys are encrypted at rest when `buildaegis.encryption.secret` is configured

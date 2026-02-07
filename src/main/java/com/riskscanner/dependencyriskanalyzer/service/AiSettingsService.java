@@ -39,11 +39,13 @@ public class AiSettingsService {
                 .map(entity -> new AiSettingsResponse(
                         entity.getProvider(),
                         entity.getModel(),
+                        entity.getCustomEndpoint(),
                         true,
                         entity.getUpdatedAt()))
                 .orElseGet(() -> new AiSettingsResponse(
                         "openai",
                         "gpt-4o",
+                        null,
                         false,
                         null));
     }
@@ -62,11 +64,15 @@ public class AiSettingsService {
         if (request.apiKey() == null || request.apiKey().isBlank()) {
             throw new IllegalArgumentException("apiKey is required");
         }
+        if ("custom".equals(request.provider()) && (request.customEndpoint() == null || request.customEndpoint().isBlank())) {
+            throw new IllegalArgumentException("customEndpoint is required for custom provider");
+        }
 
         AiSettingsEntity entity = aiSettingsRepository.findById(SETTINGS_ID).orElseGet(AiSettingsEntity::new);
         entity.setId(SETTINGS_ID);
         entity.setProvider(request.provider().trim());
         entity.setModel(request.model().trim());
+        entity.setCustomEndpoint("custom".equals(request.provider()) ? request.customEndpoint().trim() : null);
 
         boolean encrypt = cryptoService.isEncryptionConfigured();
         entity.setEncrypted(encrypt);
@@ -75,7 +81,7 @@ public class AiSettingsService {
 
         aiSettingsRepository.save(entity);
 
-        return new AiSettingsResponse(entity.getProvider(), entity.getModel(), true, entity.getUpdatedAt());
+        return new AiSettingsResponse(entity.getProvider(), entity.getModel(), entity.getCustomEndpoint(), true, entity.getUpdatedAt());
     }
 
     @Transactional(readOnly = true)
@@ -98,5 +104,10 @@ public class AiSettingsService {
     @Transactional(readOnly = true)
     public String getModel() {
         return aiSettingsRepository.findById(SETTINGS_ID).map(AiSettingsEntity::getModel).orElse("gpt-4o");
+    }
+
+    @Transactional(readOnly = true)
+    public String getCustomEndpoint() {
+        return aiSettingsRepository.findById(SETTINGS_ID).map(AiSettingsEntity::getCustomEndpoint).orElse(null);
     }
 }
