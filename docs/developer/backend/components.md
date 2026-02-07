@@ -63,12 +63,27 @@ Key endpoints:
 
 ## Services
 
+### `MavenDependencyResolver`
+**Responsibility:** Maven dependency resolution with multi-module support.
+
+**Key Features:**
+- **Multi-module detection**: Automatically discovers modules via `<modules>` in pom.xml
+- **Parent POM inheritance**: Resolves dependency management from parent chain
+- **BOM support**: Handles Bill of Materials imports for version management
+- **High confidence**: Uses Maven Resolver (Aether) for accurate dependency trees
+- **Transitive resolution**: Complete dependency graph with proper scopes
+
+**Usage Modes:**
+- **Single module**: Analyzes individual pom.xml
+- **Multi-module**: Analyzes parent and all discovered modules
+- **Automatic aggregation**: Combines findings across all modules
+
 ### `DependencyScannerService`
 **Responsibility:** dependency detection from a project path.
 
 - Detects build tool (Maven/Gradle) by scanning for build files.
 - Returns `DependencyCoordinate` objects used downstream.
-- Supports multi-project Gradle builds with intelligent project filtering.
+- Supports multi-project builds for both Maven and Gradle.
 
 ### `GradleExecutionDependencyResolver`
 **Responsibility:** Gradle dependency resolution with multi-project support.

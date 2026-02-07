@@ -160,6 +160,9 @@ When enabled, AI provides:
 
 - **Confidence**: HIGH - Uses Maven Resolver for accurate dependency trees
 - **Features**: Full transitive resolution, scope information, reliable results
+- **Multi-module support**: Automatically detects and analyzes all modules
+- **BOM support**: Handles Bill of Materials for version management
+- **Parent POM inheritance**: Resolves dependency management from parent chain
 - **Requirements**: `pom.xml` in project directory
 
 ### Gradle Projects
@@ -175,9 +178,10 @@ When enabled, AI provides:
 
 **For Maven:**
 - Point to **parent project directory**. The tool will:
-- Detect build file type
-- Attempt to analyze all modules
-- Aggregate findings across project
+- Detect `<modules>` in parent POM and discover all modules
+- Analyze parent project and each module separately
+- Aggregate findings across all modules
+- Handle BOM imports and dependency management automatically
 
 **For Gradle:**
 - **Root analysis**: Point to parent directory to analyze all relevant subprojects
@@ -185,14 +189,20 @@ When enabled, AI provides:
 - **Performance optimization**: Use `-Dgradle.skip.subprojects=true` to skip subproject analysis
 - **Automatic filtering**: Skips Node.js, docs, tests, and build utilities automatically
 
+**Maven Module Types Analyzed:**
+- ✅ All Java modules (applications, libraries, services)
+- ✅ Parent POM dependency management
+- ✅ BOM (Bill of Materials) imports
+- ✅ Transitive dependencies with proper scopes
+
 **Gradle Project Types Analyzed:**
-- Java applications and libraries
-- Web applications (Spring Boot, etc.)
-- Feature modules and shared libraries
-- Node.js/React projects (skipped automatically)
-- Documentation projects (skipped automatically)
-- Test-only projects (skipped automatically)
-- Build/utility projects (skipped automatically)
+- ✅ Java applications and libraries
+- ✅ Web applications (Spring Boot, etc.)
+- ✅ Feature modules and shared libraries
+- ❌ Node.js/React projects (skipped automatically)
+- ❌ Documentation projects (skipped automatically)
+- ❌ Test-only projects (skipped automatically)
+- ❌ Build/utility projects (skipped automatically)
 
 ## Next Steps
 

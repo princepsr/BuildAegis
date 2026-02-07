@@ -28,6 +28,8 @@ import org.eclipse.aether.resolution.DependencyResolutionException;
 import org.eclipse.aether.transport.http.HttpTransporterFactory;
 import org.apache.maven.repository.internal.MavenRepositorySystemUtils;
 import org.codehaus.plexus.util.xml.pull.XmlPullParserException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
 import java.io.File;
@@ -37,8 +39,10 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * Maven dependency resolver using Maven Resolver (Aether).
@@ -49,12 +53,15 @@ import java.util.Map;
  *   <li>Resolves transitive dependencies using Aether</li>
  *   <li>Builds dependency trees with proper scopes</li>
  *   <li>Handles dependency management and parent POM inheritance</li>
+ *   <li>Supports multi-module Maven projects</li>
+ *   <li>Discovers and analyzes all modules automatically</li>
  * </ul>
  */
 @Component
 public class MavenDependencyResolver implements DependencyResolver {
 
     private static final String MAVEN_CENTRAL = "https://repo.maven.apache.org/maven2/";
+    private static final Logger logger = LoggerFactory.getLogger(MavenDependencyResolver.class.getName());
 
     @Override
     public List<DependencyNode> resolveDependencies(Path projectPath) {
@@ -65,10 +72,46 @@ public class MavenDependencyResolver implements DependencyResolver {
                 throw new IllegalArgumentException("No pom.xml found in " + projectPath);
             }
 
+            Model rootModel = parseRawModel(pomFile);
+            List<String> modules = rootModel.getModules();
+            boolean isAggregator = "pom".equals(rootModel.getPackaging()) && modules != null && !modules.isEmpty();
+
+            if (isAggregator) {
+                Set<String> reactorGa = new HashSet<>();
+                for (String module : modules) {
+                    try {
+                        Path modulePom = pomFile.getParent().resolve(module).resolve("pom.xml");
+                        if (Files.exists(modulePom)) {
+                            Model m = parseRawModel(modulePom);
+                            String gid = (m.getGroupId() == null || m.getGroupId().isBlank())
+                                    ? (m.getParent() != null ? m.getParent().getGroupId() : null)
+                                    : m.getGroupId();
+                            if (gid != null && m.getArtifactId() != null) {
+                                reactorGa.add(gid + ":" + m.getArtifactId());
+                            }
+                        }
+                    } catch (Exception ignored) {
+                    }
+                }
+
+                List<DependencyNode> all = new ArrayList<>();
+                for (String module : modules) {
+                    try {
+                        Path modulePom = pomFile.getParent().resolve(module).resolve("pom.xml");
+                        if (Files.exists(modulePom)) {
+                            all.addAll(analyzeSingleModule(modulePom.getParent(), modulePom, reactorGa));
+                        }
+                    } catch (Exception e) {
+                        logger.warn("Failed to analyze Maven module {}: {}", module, e.getMessage());
+                    }
+                }
+                return all;
+            }
+
             // Initialize repository system
             RepositorySystem repositorySystem = newRepositorySystem();
             RepositorySystemSession session = newRepositorySession(repositorySystem);
-            
+
             // Create remote repositories
             List<RemoteRepository> repositories = List.of(
                     new RemoteRepository.Builder("central", "default", MAVEN_CENTRAL).build()
@@ -90,7 +133,8 @@ public class MavenDependencyResolver implements DependencyResolver {
             Artifact rootArtifact = new DefaultArtifact(
                 groupId,
                 model.getArtifactId(),
-                packaging,
+                "",
+                "pom",
                 version
             ).setFile(pomFile.toFile());
 
@@ -100,7 +144,7 @@ public class MavenDependencyResolver implements DependencyResolver {
             collectRequest.setRepositories(repositories);
             
             // Resolve versions from parent POM locally (avoid remote lookups)
-            Map<String, String> managedVersions = resolveManagedVersionsFromParent(model);
+            Map<String, String> managedVersions = resolveManagedVersionsFromParent(model, pomFile);
             
             // Add dependencies from POM with resolved versions
             for (org.apache.maven.model.Dependency dep : model.getDependencies()) {
@@ -226,18 +270,93 @@ public class MavenDependencyResolver implements DependencyResolver {
         }
         return versions;
     }
+
+    private Map<String, String> resolveBomVersions(String groupId, String artifactId, String version) {
+        return resolveBomVersions(groupId, artifactId, version, null);
+    }
+
+    private Map<String, String> resolveManagedVersionsFromParent(Model model, Path pomFile) {
+        Map<String, String> versions = new HashMap<>();
+
+        Model currentModel = model;
+        Path currentPom = pomFile;
+        while (currentModel != null && currentModel.getParent() != null) {
+            org.apache.maven.model.Parent parentInfo = currentModel.getParent();
+
+            Model parentModel = loadParentModel(currentPom, parentInfo);
+            if (parentModel == null) {
+                break;
+            }
+
+            Map<String, String> properties = buildPropertyMap(parentModel);
+            if (parentModel.getDependencyManagement() != null) {
+                for (org.apache.maven.model.Dependency dep : parentModel.getDependencyManagement().getDependencies()) {
+                    if ("import".equals(dep.getScope()) && "pom".equals(dep.getType())) {
+                        String bomVersion = dep.getVersion();
+                        if (bomVersion != null && !bomVersion.isBlank()) {
+                            bomVersion = resolveProperty(bomVersion, properties);
+                            if (bomVersion != null && !bomVersion.contains("${")) {
+                                Path moduleDir = currentPom.getParent();
+                                Path rootDir = moduleDir != null ? moduleDir.getParent() : null;
+                                versions.putAll(resolveBomVersions(dep.getGroupId(), dep.getArtifactId(), bomVersion, rootDir));
+                            }
+                        }
+                    } else {
+                        String key = dep.getGroupId() + ":" + dep.getArtifactId();
+                        String v = dep.getVersion();
+                        if (v != null && !v.isBlank()) {
+                            v = resolveProperty(v, properties);
+                            if (v != null && !v.isBlank() && !v.contains("${")) {
+                                versions.putIfAbsent(key, v);
+                            }
+                        }
+                    }
+                }
+            }
+
+            currentModel = parentModel;
+
+            String rel = parentInfo.getRelativePath();
+            if (rel == null || rel.isBlank()) {
+                rel = "../pom.xml";
+            }
+            Path candidate = currentPom.getParent().resolve(rel).normalize();
+            currentPom = candidate;
+        }
+
+        return versions;
+    }
     
+    private Model loadParentModel(Path childPom, org.apache.maven.model.Parent parent) {
+        if (parent == null) {
+            return null;
+        }
+
+        try {
+            String rel = parent.getRelativePath();
+            if (rel == null || rel.isBlank()) {
+                rel = "../pom.xml";
+            }
+            Path localParentPom = childPom.getParent().resolve(rel).normalize();
+            if (Files.exists(localParentPom)) {
+                return parseRawModel(localParentPom);
+            }
+        } catch (Exception ignored) {
+        }
+
+        return loadParentModel(parent);
+    }
+
     private Model loadParentModel(org.apache.maven.model.Parent parent) {
         if (parent == null) return null;
-        
+
         try {
-            String relativePath = parent.getGroupId().replace('.', '/') + '/' + 
-                                 parent.getArtifactId() + '/' + parent.getVersion() + '/' + 
+            String relativePath = parent.getGroupId().replace('.', '/') + '/' +
+                                 parent.getArtifactId() + '/' + parent.getVersion() + '/' +
                                  parent.getArtifactId() + '-' + parent.getVersion() + ".pom";
             File localRepo = new File(System.getProperty("user.home"), ".m2/repository");
             File parentPom = new File(localRepo, relativePath);
-            
-            // Download from Maven Central if not in local repo
+
             if (!parentPom.exists()) {
                 String centralUrl = MAVEN_CENTRAL + relativePath;
                 java.nio.file.Path tempFile = java.nio.file.Files.createTempFile(parent.getArtifactId(), ".pom");
@@ -247,7 +366,7 @@ public class MavenDependencyResolver implements DependencyResolver {
                 parentPom = tempFile.toFile();
                 parentPom.deleteOnExit();
             }
-            
+
             MavenXpp3Reader reader = new MavenXpp3Reader();
             try (FileReader fileReader = new FileReader(parentPom)) {
                 return reader.read(fileReader);
@@ -330,9 +449,31 @@ public class MavenDependencyResolver implements DependencyResolver {
         return versions;
     }
 
-    private Map<String, String> resolveBomVersions(String groupId, String artifactId, String version) {
+    private Map<String, String> resolveBomVersions(String groupId, String artifactId, String version, Path localSearchRoot) {
         Map<String, String> versions = new HashMap<>();
         try {
+            if (localSearchRoot != null) {
+                Path localBomPom = localSearchRoot.resolve(artifactId).resolve("pom.xml");
+                if (Files.exists(localBomPom)) {
+                    Model bomModel = parseRawModel(localBomPom);
+                    Map<String, String> bomProperties = buildPropertyMap(bomModel);
+
+                    if (bomModel.getDependencyManagement() != null) {
+                        for (org.apache.maven.model.Dependency dep : bomModel.getDependencyManagement().getDependencies()) {
+                            String key = dep.getGroupId() + ":" + dep.getArtifactId();
+                            String depVersion = dep.getVersion();
+                            if (depVersion != null && !depVersion.isBlank()) {
+                                depVersion = resolveProperty(depVersion, bomProperties);
+                                if (depVersion != null && !depVersion.isBlank() && !depVersion.contains("${")) {
+                                    versions.put(key, depVersion);
+                                }
+                            }
+                        }
+                    }
+                    return versions;
+                }
+            }
+
             String bomPath = groupId.replace('.', '/') + '/' + 
                             artifactId + '/' + version + '/' + 
                             artifactId + '-' + version + ".pom";
@@ -473,5 +614,184 @@ public class MavenDependencyResolver implements DependencyResolver {
         LocalRepository localRepo = new LocalRepository(System.getProperty("user.home") + File.separator + ".m2" + File.separator + "repository");
         session.setLocalRepositoryManager(system.newLocalRepositoryManager(session, localRepo));
         return session;
+    }
+
+    /**
+     * Discovers Maven modules from pom.xml.
+     */
+    private List<String> discoverModules(Path pomFile) {
+        try {
+            Model model = parseRawModel(pomFile);
+            List<String> modules = model.getModules();
+            
+            if (modules == null || modules.isEmpty()) {
+                logger.debug("No modules found in pom.xml");
+                return new ArrayList<>();
+            }
+            
+            logger.debug("Discovered {} modules: {}", modules.size(), modules);
+            return new ArrayList<>(modules);
+            
+        } catch (Exception e) {
+            logger.warn("Failed to discover modules: {}", e.getMessage());
+            return new ArrayList<>();
+        }
+    }
+
+    /**
+     * Analyzes a single Maven module.
+     */
+    private List<DependencyNode> analyzeSingleModule(Path modulePath, Path pomFile) {
+        return analyzeSingleModule(modulePath, pomFile, Set.of());
+    }
+
+    private List<DependencyNode> analyzeSingleModule(Path modulePath, Path pomFile, Set<String> reactorGa) {
+        try {
+            // Initialize repository system
+            RepositorySystem repositorySystem = newRepositorySystem();
+            RepositorySystemSession session = newRepositorySession(repositorySystem);
+            
+            // Create remote repositories
+            List<RemoteRepository> repositories = List.of(
+                    new RemoteRepository.Builder("central", "default", MAVEN_CENTRAL).build()
+            );
+            
+            // Parse the POM to get project coordinates
+            Model model = parseRawModel(pomFile);
+            String groupId = model.getGroupId();
+            if (groupId == null || groupId.isBlank()) {
+                groupId = model.getParent() != null ? model.getParent().getGroupId() : "unknown";
+            }
+            String version = model.getVersion();
+            if (version == null || version.isBlank()) {
+                version = model.getParent() != null ? model.getParent().getVersion() : "1.0.0";
+            }
+            String packaging = model.getPackaging() != null ? model.getPackaging() : "jar";
+
+            Map<String, String> properties = buildPropertyMap(model);
+            if (model.getParent() != null) {
+                Model parentModel = loadParentModel(pomFile, model.getParent());
+                if (parentModel != null) {
+                    Map<String, String> parentProps = buildPropertyMap(parentModel);
+                    parentProps.forEach(properties::putIfAbsent);
+
+                    if ((version == null || version.isBlank()) && parentModel.getVersion() != null) {
+                        version = parentModel.getVersion();
+                    }
+                }
+            }
+
+            if (version != null && !version.isBlank()) {
+                properties.putIfAbsent("project.version", version);
+                properties.putIfAbsent("pom.version", version);
+            }
+            
+            // Skip BOM projects (packaging=pom) with no dependencies
+            if ("pom".equals(packaging)) {
+                // Check if this is a BOM project (dependency management only)
+                boolean hasDependencyManagement = model.getDependencyManagement() != null && 
+                                                  !model.getDependencyManagement().getDependencies().isEmpty();
+                boolean hasActualDependencies = model.getDependencies() != null && 
+                                              !model.getDependencies().isEmpty();
+                
+                if (!hasActualDependencies && hasDependencyManagement) {
+                    logger.info("Skipping BOM project (dependency management only): {}", model.getArtifactId());
+                    return new ArrayList<>();
+                }
+                
+                // If it has actual dependencies, analyze it normally
+                if (!hasActualDependencies) {
+                    logger.info("BOM project has no runtime dependencies, skipping: {}", model.getArtifactId());
+                    return new ArrayList<>();
+                }
+            }
+
+            // Create root artifact representing this project with pom file
+            // Use "pom" type and empty classifier so Aether treats it as a POM project
+            Artifact rootArtifact = new DefaultArtifact(
+                groupId,
+                model.getArtifactId(),
+                "",
+                "pom",
+                version
+            ).setFile(pomFile.toFile());
+
+            // Create collect request WITHOUT setting a root artifact
+            // We'll add dependencies directly - this prevents Aether from trying to
+            // resolve the local module artifact from Maven Central
+            CollectRequest collectRequest = new CollectRequest();
+            collectRequest.setRepositories(repositories);
+            
+            // DON'T set a root dependency - this was causing Aether to try to download
+            // the module artifact itself from Central. Instead, we'll collect
+            // dependencies starting from an empty root.
+            // collectRequest.setRoot(new Dependency(rootArtifact, "compile"));
+
+            // Resolve versions from parent POM locally (avoid remote lookups)
+            Map<String, String> managedVersions = resolveManagedVersionsFromParent(model, pomFile);
+            
+            // Add dependencies from POM with resolved versions
+            for (org.apache.maven.model.Dependency dep : model.getDependencies()) {
+                String depVersion = dep.getVersion();
+                String key = dep.getGroupId() + ":" + dep.getArtifactId();
+
+                // Skip reactor (multi-module) dependencies - they are analyzed as modules separately
+                if (reactorGa != null && reactorGa.contains(key)) {
+                    continue;
+                }
+
+                if (depVersion != null && !depVersion.isBlank()) {
+                    depVersion = resolveProperty(depVersion, properties);
+                }
+                if ((depVersion == null || depVersion.isBlank()) && managedVersions.containsKey(key)) {
+                    depVersion = managedVersions.get(key);
+                }
+
+                if (depVersion != null && depVersion.contains("${")) {
+                    depVersion = resolveProperty(depVersion, properties);
+                }
+                
+                Artifact depArtifact = new DefaultArtifact(
+                    dep.getGroupId(),
+                    dep.getArtifactId(),
+                    dep.getType() != null ? dep.getType() : "jar",
+                    depVersion != null ? depVersion : "LATEST"
+                );
+                String scope = (dep.getScope() == null || dep.getScope().isBlank()) ? "compile" : dep.getScope();
+                collectRequest.addDependency(new Dependency(depArtifact, scope));
+            }
+            
+            // Collect and resolve dependencies
+            org.eclipse.aether.collection.CollectResult collectResult = repositorySystem
+                    .collectDependencies(session, collectRequest);
+            org.eclipse.aether.graph.DependencyNode aetherRoot = collectResult.getRoot();
+
+            // Now resolve to get the full tree with transitive deps
+            DependencyRequest dependencyRequest = new DependencyRequest(aetherRoot, null);
+            repositorySystem.resolveDependencies(session, dependencyRequest);
+            
+            // Convert to our model - children of root are direct dependencies
+            List<DependencyNode> roots = new ArrayList<>();
+            java.util.Set<String> declaredDirectGa = new java.util.HashSet<>();
+            for (org.apache.maven.model.Dependency d : model.getDependencies()) {
+                if (d.getGroupId() != null && d.getArtifactId() != null) {
+                    declaredDirectGa.add(d.getGroupId() + ":" + d.getArtifactId());
+                }
+            }
+
+            for (org.eclipse.aether.graph.DependencyNode child : aetherRoot.getChildren()) {
+                Artifact a = child.getArtifact();
+                boolean isDirect = false;
+                if (a != null) {
+                    isDirect = declaredDirectGa.contains(a.getGroupId() + ":" + a.getArtifactId());
+                }
+                roots.add(convertNode(child, List.of(), isDirect));
+            }
+            return roots;
+            
+        } catch (Exception e) {
+            logger.error("Failed to analyze Maven module {}: {}", modulePath, e.getMessage());
+            return new ArrayList<>();
+        }
     }
 }

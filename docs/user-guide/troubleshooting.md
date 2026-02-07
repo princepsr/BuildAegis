@@ -42,6 +42,107 @@ ls /path/to/project/build.gradle.kts
 3. Check backend logs in `logs/application.log`
 4. Try with a simpler project to isolate the issue
 
+#### Maven multi-module shows 0 dependencies
+**Symptoms**: Analysis completes but shows 0 dependencies for all modules
+
+**Error in logs**:
+```
+Could not find artifact [groupId]:[artifactId]:pom:[version]-SNAPSHOT in central
+```
+
+**Explanation**: 
+This error occurs when Aether tries to download the local module artifact itself from Maven Central, rather than just analyzing its dependencies. The module artifact (like `time-tracker-core-0.6.0-SNAPSHOT`) only exists locally and was never published.
+
+**Solutions**:
+1. **Ensure you're running the latest version** with multi-module fixes
+2. **Verify module structure**:
+   ```xml
+   <!-- Parent pom.xml should declare modules -->
+   <modules>
+       <module>core</module>
+       <module>web</module>
+   </modules>
+   ```
+3. **Check that modules inherit from parent**:
+   ```xml
+   <!-- Child module pom.xml -->
+   <parent>
+       <groupId>com.example</groupId>
+       <artifactId>parent-project</artifactId>
+       <version>1.0.0-SNAPSHOT</version>
+   </parent>
+   ```
+4. **Re-analyze after server restart** (if you updated the code)
+
+**What was fixed**:
+The resolver now:
+- Uses an empty root in CollectRequest (instead of the module artifact itself)
+- Resolves property-based versions like `${spring.version}` from parent POM
+- Skips internal reactor module dependencies (they're analyzed separately)
+- Resolves parent POMs via `relativePath` instead of downloading from Central
+
+#### Maven multi-module analysis is incomplete
+**Symptoms**: Maven multi-module project shows fewer modules than expected
+
+**Possible Causes**:
+1. Module paths are incorrect relative to parent
+2. Module pom.xml files are missing or malformed
+3. Parent POM doesn't declare all modules
+
+**Solutions**:
+1. **Verify module declarations**:
+   ```xml
+   <!-- In parent pom.xml -->
+   <modules>
+       <module>module-a</module>
+       <module>module-b</module>
+       <module>module-c</module>
+   </modules>
+   ```
+2. **Check module directories**:
+   ```bash
+   ls -la /path/to/parent/
+   # Should see module-a/, module-b/, module-c/ directories
+   ```
+3. **Verify module pom.xml exists**:
+   ```bash
+   ls /path/to/parent/module-a/pom.xml
+   ls /path/to/parent/module-b/pom.xml
+   ```
+4. **Check logs**: Look for "Module pom.xml not found" warnings
+
+#### Maven parent POM analysis fails
+**Symptoms**: "Failed to analyze parent project" or missing dependencies
+
+**Possible Causes**:
+1. Parent POM has complex inheritance chain
+2. BOM imports are failing
+3. Network connectivity issues for parent resolution
+
+**Solutions**:
+1. **Check parent POM structure**:
+   ```xml
+   <parent>
+       <groupId>com.example</groupId>
+       <artifactId>parent-project</artifactId>
+       <version>1.0.0</version>
+   </parent>
+   ```
+2. **Verify BOM imports**:
+   ```xml
+   <dependencyManagement>
+       <dependencies>
+           <dependency>
+               <groupId>org.springframework.boot</groupId>
+               <artifactId>spring-boot-dependencies</artifactId>
+               <version>3.1.0</version>
+               <type>pom</type>
+               <scope>import</scope>
+           </dependency>
+       </dependencies>
+   </dependencyManagement>
+   ```
+
 #### Gradle projects show fewer dependencies than expected
 **Symptoms**: Gradle analysis shows incomplete dependency list
 
@@ -489,16 +590,20 @@ curl "http://localhost:8080/buildaegis/api/project/scan?projectPath=/valid/path"
 
 ## Known Limitations
 
-### By Design
+#### By Design
 
 1. **Gradle accuracy**: MEDIUM confidence due to dynamic resolution
 2. **False positives**: Possible with transitive dependencies
 3. **AI optional**: Core detection works without AI
 4. **Cache scoped by provider**: Same dep with different AI = separate cache
 
-### Being Addressed
+#### Completed (Previously Being Addressed)
 
-1. Multi-module project aggregation improvements
+1. ~~Multi-module project aggregation improvements~~ - **IMPLEMENTED**
+   - Maven multi-module support with automatic module discovery
+   - Parent POM inheritance and BOM handling
+   - Property-based version resolution (`${spring.version}`, `${project.version}`)
+   
 2. Better Gradle build file parsing
 3. Enhanced false positive detection
 
