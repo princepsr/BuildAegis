@@ -294,6 +294,72 @@ const BuildAegis = (() => {
 
   // UI Components
   const UI = {
+    initFolderBrowser() {
+      const modal = DOM.get('browseModal');
+      const list = DOM.get('browseList');
+      const pathEl = DOM.get('browsePath');
+      const errorEl = DOM.get('browseError');
+      const upBtn = DOM.get('browseUp');
+      const selectBtn = DOM.get('browseSelect');
+      let current = { path: '', parent: null };
+
+      const close = () => DOM.hide(modal);
+      const choose = (path) => {
+        DOM.get('buildFileContent').value = path;
+        close();
+      };
+
+      const load = async (path) => {
+        try {
+          const response = await fetch(`${API.BASE_URL}/system/fs?path=${encodeURIComponent(path || '')}`, { headers: API.HEADERS });
+          const data = await response.json().catch(() => ({}));
+          if (!response.ok) throw new Error(data.error || 'Unable to list folder');
+
+          current = data;
+          pathEl.textContent = data.path || 'This computer';
+          errorEl.hidden = true;
+          upBtn.disabled = data.parent === null || data.parent === undefined;
+          selectBtn.disabled = !data.path;
+
+          list.innerHTML = '';
+          data.entries.forEach((entry) => {
+            const li = document.createElement('li');
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = entry.directory ? 'fs-item' : 'fs-item fs-item--file';
+            btn.textContent = entry.directory ? `${entry.name}/` : entry.name;
+            btn.addEventListener('click', () => (entry.directory ? load(entry.path) : choose(entry.path)));
+            li.appendChild(btn);
+            list.appendChild(li);
+          });
+          if (data.entries.length === 0) {
+            const li = document.createElement('li');
+            li.className = 'muted';
+            li.textContent = 'No sub-folders or build files here.';
+            list.appendChild(li);
+          }
+          return true;
+        } catch (error) {
+          errorEl.textContent = error.message;
+          errorEl.hidden = false;
+          return false;
+        }
+      };
+
+      DOM.on(DOM.get('browseProjectPath'), 'click', async () => {
+        DOM.show(modal);
+        const typed = DOM.get('buildFileContent')?.value.trim() || '';
+        // If the typed path is not a valid folder, start from the top level instead
+        if (!(await load(typed))) await load('');
+      });
+      DOM.on(upBtn, 'click', () => load(current.parent || ''));
+      DOM.on(selectBtn, 'click', () => choose(current.path));
+      DOM.on(DOM.get('closeBrowse'), 'click', close);
+      DOM.on(modal, 'click', (e) => {
+        if (e.target.classList.contains('modal__backdrop')) close();
+      });
+    },
+
     init() {
       this.bindEvents();
       this.updateUI();
@@ -323,27 +389,8 @@ const BuildAegis = (() => {
         this.updateUI();
       });
       
-      // Project path file chooser
-      DOM.on(DOM.get('browseProjectPath'), 'click', async () => {
-        const browseBtn = DOM.get('browseProjectPath');
-        if (browseBtn.disabled) return;
-        browseBtn.disabled = true;
-        const label = browseBtn.querySelector('span:last-child');
-        const originalLabel = label ? label.textContent : '';
-        if (label) label.textContent = 'Waiting for file dialog...';
-        try {
-          const response = await fetch(`${API.BASE_URL}/system/browse`, { method: 'POST', headers: API.HEADERS });
-          if (response.status === 204) return;
-          const data = await response.json().catch(() => ({}));
-          if (!response.ok) throw new Error(data.error || 'Unable to open the file chooser');
-          DOM.get('buildFileContent').value = data.path;
-        } catch (error) {
-          UI.showError(error.message);
-        } finally {
-          browseBtn.disabled = false;
-          if (label) label.textContent = originalLabel;
-        }
-      });
+      // Project path folder browser (in-page modal backed by GET /api/system/fs)
+      this.initFolderBrowser();
 
       // AI Settings buttons
       DOM.on(DOM.get('saveAISettings'), 'click', () => AISettings.save());

@@ -1116,3 +1116,9 @@ html.lite *, html.lite *::before, html.lite *::after{
   text-shadow:none !important;
   transition:none !important;
 }
+
+/* In-page folder browser for the project path */
+.fs-list{list-style:none; margin:12px 0 0; padding:0; max-height:50vh; overflow:auto;}
+.fs-item{display:block; width:100%; text-align:left; padding:8px 10px; background:none; border:0; border-bottom:1px solid rgba(127,127,127,.2); color:var(--text); font:inherit; cursor:pointer;}
+.fs-item:hover,.fs-item:focus{background:rgba(127,127,127,.15); outline:none;}
+.fs-item--file{color:var(--muted);}
