@@ -837,8 +837,8 @@ const BuildAegis = (() => {
       }
     },
     
-    // `summary`/`findings` describe the filtered view and drive the tiles, risk score and status chip;
-    // `overall` is the whole analysis and only feeds the "All dependencies" reference note under the score.
+    // `summary`/`findings` describe the filtered view and drive the count tiles; `overall` is the whole analysis and
+    // drives the overall risk score and status chip (the filtered view's score is shown on its own line).
     updateSummary(summary, findings = [], overall = State.allFindings) {
       const { critical = 0, high = 0, medium = 0, low = 0 } = summary;
 
@@ -853,29 +853,29 @@ const BuildAegis = (() => {
       const vulnerable = findings.filter(f => (f.vulnerabilityCount || 0) > 0).length;
       DOM.setText(DOM.get('kpiVulnsFound'), vulnerable);
       
-      // Risk score and status describe the current (filtered) view
-      DOM.setText(DOM.get('kpiOverallRisk'), this.riskScoreFor(findings));
+      // The overall score and status chip always describe the whole project; a filtered view gets its own line
+      DOM.setText(DOM.get('kpiOverallRisk'), this.riskScoreFor(overall));
 
-      // While a filter is active, show the whole-project score for reference
       const noteEl = DOM.get('kpiOverallNote');
       if (noteEl) {
         const filtered = findings.length !== overall.length;
         noteEl.hidden = !filtered || overall.length === 0;
-        noteEl.textContent = `All dependencies: ${this.riskScoreFor(overall)}`;
+        noteEl.textContent = `Filtered view: ${this.riskScoreFor(findings)}`;
       }
 
+      const all = this.computeSummary(overall);
       const statusEl = DOM.get('appStatus');
       
-      if (total === 0) {
+      if (all.critical + all.high + all.medium + all.low === 0) {
         statusEl.className = 'status-chip status-chip--success';
         statusEl.textContent = 'No Issues';
-      } else if (critical > 0) {
+      } else if (all.critical > 0) {
         statusEl.className = 'status-chip status-chip--critical';
         statusEl.textContent = 'Critical Issues';
-      } else if (high > 0) {
+      } else if (all.high > 0) {
         statusEl.className = 'status-chip status-chip--high';
         statusEl.textContent = 'High Risk';
-      } else if (medium > 0) {
+      } else if (all.medium > 0) {
         statusEl.className = 'status-chip status-chip--medium';
         statusEl.textContent = 'Medium Risk';
       } else {
@@ -884,67 +884,16 @@ const BuildAegis = (() => {
       }
     },
     
-    // Risk score for a list of findings. Clean (zero-vulnerability) dependencies are not risk and don't add to it.
+    // Risk score (0-100) for a list of findings: the highest per-dependency risk score from the backend, plus 1 point
+    // for each additional dependency with known vulnerabilities (max +5). This keeps the overall score consistent
+    // with the per-dependency scores instead of using a separate weighted formula.
     riskScoreFor(list) {
-      const s = this.computeSummary(list);
-      const lowWithVulns = list.filter(f =>
-        String(f.severity).toUpperCase() === 'LOW' && (f.vulnerabilityCount || 0) > 0).length;
-      return this.calculateRealisticRiskScore(s.critical, s.high, s.medium, lowWithVulns);
+      if (!list || list.length === 0) return 0;
+      const base = Math.max(...list.map(f => f.riskScore || 0));
+      const vulnerable = list.filter(f => (f.vulnerabilityCount || 0) > 0).length;
+      return Math.min(100, base + Math.min(5, Math.max(0, vulnerable - 1)));
     },
 
-    calculateRealisticRiskScore(critical, high, medium, low) {
-      // Weighted impact values (Critical disproportionately higher)
-      const weights = { critical: 40, high: 15, medium: 5, low: 1 };
-      
-      // Calculate raw weighted score
-      const rawScore = critical * weights.critical + 
-                       high * weights.high + 
-                       medium * weights.medium + 
-                       low * weights.low;
-      
-      // "Worst case" reference: 5 Critical, 15 High, 30 Medium, 50 Low
-      const maxRawScore = 5 * weights.critical + 15 * weights.high + 30 * weights.medium + 50 * weights.low;
-      
-      // Normalize to 0-70 base scale (leaving room for critical dominance boost)
-      let normalizedScore = (rawScore / maxRawScore) * 70;
-      
-      // Critical dominance: non-linear boost based on critical count
-      // 1 Critical = minimum 40 (high risk floor)
-      // 2 Critical = minimum 60
-      // 3 Critical = minimum 75
-      // 4+ Critical = minimum 90
-      const criticalBoost = critical >= 4 ? 35 : 
-                            critical === 3 ? 25 : 
-                            critical === 2 ? 15 : 
-                            critical === 1 ? 10 : 0;
-      
-      // Calculate final score
-      let finalScore = Math.min(100, normalizedScore + criticalBoost);
-      
-      // Guardrails
-      if (critical > 0 && finalScore < 40) {
-        finalScore = 40; // Critical presence guarantees at least 40
-      }
-      if (critical >= 2 && finalScore < 60) {
-        finalScore = 60; // Multiple criticals guarantee at least 60
-      }
-      if (critical === 0 && high === 0 && finalScore > 30) {
-        finalScore = 30; // Only medium/low cannot exceed 30
-      }
-      // Severity floors keep small views meaningful (e.g. a High-only filter must not score near zero)
-      if (high > 0 && finalScore < 25) {
-        finalScore = 25;
-      }
-      if (medium > 0 && finalScore < 10) {
-        finalScore = 10;
-      }
-      if (low > 0 && finalScore < 3) {
-        finalScore = 3;
-      }
-      
-      return Math.round(finalScore);
-    },
-    
     computeSummary(findings) {
       return findings.reduce((acc, finding) => {
         const s = String(finding.severity || '').toUpperCase();
