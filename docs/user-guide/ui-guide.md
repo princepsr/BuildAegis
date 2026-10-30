@@ -325,6 +325,9 @@ Opened by clicking "View" on any finding row.
 
 ### Content Sections
 
+#### Suggested fix
+Shown when a fixed version is known: "Upgrade to X", the smallest version on your current major version that fixes the vulnerabilities. If some vulnerabilities are only fixed in another major version, a note says how many and which version they need.
+
 #### Description
 Full vulnerability description explaining:
 - What the vulnerability is

@@ -30,7 +30,7 @@ Open:
 
 ### Continuous integration
 
-Every pull request runs `mvn verify` (all tests, including the Spring context test) in GitHub Actions (`.github/workflows/ci.yml`). The context test uses an in-memory database, so running the tests never touches your local `./data` database. A second, informational job compiles the desktop wrapper with `-Pdesktop`.
+After every push to `main`, GitHub Actions (`.github/workflows/ci.yml`) runs `mvn verify` (all tests, including the Spring context test); it does not run on pull requests, so run `mvn verify` locally before opening one. The context test uses an in-memory database, so running the tests never touches your local `./data` database. A second, informational job compiles the desktop wrapper with `-Pdesktop`.
 
 ## What to contribute
 
