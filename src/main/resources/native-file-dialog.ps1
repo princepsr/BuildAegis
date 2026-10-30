@@ -5,10 +5,6 @@ $ErrorActionPreference = 'Stop'
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
-Add-Type -Namespace Native -Name Win -MemberDefinition @'
-[DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr hWnd);
-[DllImport("user32.dll")] public static extern void keybd_event(byte bVk, byte bScan, uint dwFlags, UIntPtr dwExtraInfo);
-'@
 
 # Invisible always-on-top owner window so the dialog is shown in front of everything
 $owner = New-Object System.Windows.Forms.Form
@@ -19,11 +15,12 @@ $owner.StartPosition = 'CenterScreen'
 $owner.Size = New-Object System.Drawing.Size(1, 1)
 $owner.Show()
 
-# Windows only lets the process that received the last input take the foreground; a synthetic Alt
-# key press counts as input, which lets this process come to the front of the browser window.
-[Native.Win]::keybd_event(0x12, 0, 0, [UIntPtr]::Zero)
-[Native.Win]::keybd_event(0x12, 0, 2, [UIntPtr]::Zero)
-[Native.Win]::SetForegroundWindow($owner.Handle) | Out-Null
+# Windows only lets the process that received the last input take the foreground; a synthetic key press
+# counts as input, which lets this process come to the front of the browser window. WScript.Shell is used
+# instead of P/Invoke because Add-Type would compile C# on every launch, which is slow.
+$shell = New-Object -ComObject WScript.Shell
+$shell.SendKeys('{F15}')
+[void]$shell.AppActivate($PID)
 $owner.Activate()
 
 $dlg = New-Object System.Windows.Forms.OpenFileDialog
