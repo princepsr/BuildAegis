@@ -73,16 +73,28 @@ class DeterministicRiskCalculatorTest {
     }
 
     @Test
-    void vulnerabilityPointsAreCapped() {
-        var r = risk(enrichment(4, Map.of("CRITICAL", 4), "CRITICAL", null, null));
-        assertEquals(95, r.riskScore());
+    void extraVulnerabilitiesAddALittleAndAreCapped() {
+        assertEquals(84, risk(enrichment(4, Map.of("CRITICAL", 4), "CRITICAL", null, null)).riskScore());
+        assertEquals(85, risk(enrichment(20, Map.of("CRITICAL", 20), "CRITICAL", null, null)).riskScore());
+        assertEquals(75, risk(enrichment(20, Map.of("HIGH", 20), "HIGH", null, null)).riskScore());
+    }
+
+    @Test
+    void severalHighVulnerabilitiesDoNotSaturateTheScale() {
+        int one = risk(enrichment(1, Map.of("HIGH", 1), "HIGH", null, null)).riskScore();
+        int two = risk(enrichment(2, Map.of("HIGH", 2), "HIGH", null, null)).riskScore();
+        int critical = risk(enrichment(1, Map.of("CRITICAL", 1), "CRITICAL", null, null)).riskScore();
+        int exploited = risk(enrichment(1, Map.of("HIGH", 1), "HIGH", true, null)).riskScore();
+
+        assertEquals(63, two);
+        assertTrue(one < two && two < critical && critical < exploited);
     }
 
     @Test
     void vulnerabilitiesWithoutSeverityCountAsMedium() {
-        // 1 known HIGH + 2 without severity information: 40 + 2 * 20 = 80 points, capped at 75
+        // 1 known HIGH + 2 without severity information: 40 for the worst, 2 * 3 for the extra ones
         var r = risk(enrichment(3, Map.of("HIGH", 1), "HIGH", null, null));
-        assertEquals(95, r.riskScore());
+        assertEquals(66, r.riskScore());
     }
 
     @Test

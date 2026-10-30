@@ -103,7 +103,8 @@ public class MetadataEnrichmentService {
                 osv.maxSeverity(),
                 osv.severityCounts().isEmpty() ? null : osv.severityCounts(),
                 osv.vulnerabilityCount() == null ? null : exploit.knownExploited(),
-                exploit.maxEpss()
+                exploit.maxEpss(),
+                osv.fixNote()
         );
     }
 

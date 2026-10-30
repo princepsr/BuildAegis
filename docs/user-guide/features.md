@@ -124,6 +124,16 @@ Confidence indicates reliability of vulnerability detection:
 - **Azure OpenAI**: Enterprise deployments
 - **Custom (OpenAI-compatible)**: Any provider that exposes an OpenAI-compatible Chat Completions API
 
+#### Trying AI without an API key
+
+Run the bundled fake AI server, which answers like an OpenAI-compatible service without any model or key:
+
+```bash
+node tools/mock-ai-server.js
+```
+
+Then in AI settings choose the preset **LM Studio (local, any API key)** (endpoint `http://localhost:1234/v1/chat/completions`), type any API key, save, and use **Test connection**, **Analyze** with AI enabled, and **Ask AI about this finding**. Answers are canned (marked `[mock AI]`), but the server prints every prompt it receives, so you can check what BuildAegis sends. Start it with `RATE_LIMIT_EVERY=3 node tools/mock-ai-server.js` to make every third request fail with a rate limit and watch the retries. For real answers without a key, install [Ollama](https://ollama.com) or LM Studio and pick that provider.
+
 #### AI Configuration Persistence
 
 The UI now supports saving AI settings to the backend:
