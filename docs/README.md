@@ -50,12 +50,14 @@ docs/
 ## Key Information
 
 ### Current Risk Scoring Algorithm
-BuildAegis uses a **critical-dominance weighted algorithm** with the following characteristics:
+The overall risk score is built from the **per-dependency risk scores** calculated by the backend:
 
-- **Critical vulnerabilities** have disproportionate impact (40 points each + boost)
-- **Minimum score floors** based on critical count: 1 Critical min 40, 2 Critical min 60, 3+ Critical min 90
+- **Overall score** = highest dependency score in the project + 1 point per additional vulnerable dependency (max +5), capped at 100
+- **Per-dependency score** (0-100): base 20, +25 per known vulnerability (max +60), plus small maintenance/adoption factors; 70+ = High, 40-69 = Medium, 20-39 = Low
+- **Whole project, not the current view**: filters and search do **not** change the overall score or status chip. While filtering, a "Filtered view: N" line shows the score of the visible findings
 - **Scale**: 0-100, where higher = more risk
-- **Current view only**: Score represents filtered/current view, not total project
+
+See [Risk Scoring](architecture/risk-scoring.md).
 
 ### Frontend Structure (Accurate)
 The frontend is **NOT** component-based as previously documented. It's a simple, flat structure:

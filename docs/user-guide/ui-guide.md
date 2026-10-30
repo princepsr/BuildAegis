@@ -83,12 +83,30 @@ Click the "i" button next to "Build tool" for:
 - Shows `X characters` as you type
 - Helps verify path was entered
 
+#### Browse Button
+Click **Browse...** under the text area to pick the project instead of typing the path:
+
+- On Windows this opens the standard Windows file dialog (it should appear in front of the browser; the first open can take a moment).
+- Select a `pom.xml` / `build.gradle` / `build.gradle.kts` file, **or** open your project folder and press **Open** to select the folder itself.
+- The dialog starts in the folder you already typed, if it is valid.
+- Choosing a path fills the text area and enables **Analyze Dependencies**.
+- Cancelling the dialog leaves the path unchanged.
+- If a file dialog cannot be shown (for example the server has no display), an in-page folder browser opens instead: click a folder to go into it, **Up** to go back, **Use this folder** to select it, or click a build file to select it.
+
+The dialog opens on the machine that runs BuildAegis. Run BuildAegis on your own machine to use it.
+
 #### Action Buttons
 | Button | Icon | Purpose |
 |--------|------|---------|
-| **Analyze Dependencies** | 🔍 | Start full analysis |
-| **Load Cached** | 📂 | Load previous results from database |
+| **Browse...** | 📂 | Pick the project folder or build file |
+| **Analyze Dependencies** | 🔍 | Start full analysis (enabled once a path is entered or picked) |
+| **Load Cached** | 📂 | Load previous results from database (see below) |
 | **Clear** | 🗑️ | Clear project path input |
+
+#### Load Cached
+- With a **project path** in the text area, Load Cached shows only that project's cached results. The path can be the folder or its build file.
+- With an **empty** text area, it shows every cached result.
+- A project has cached results only after it has been analyzed once; otherwise you see "No cached results found for this project".
 
 ### 3. Transparency & Security Sections
 
@@ -141,15 +159,17 @@ Seven metric cards showing:
 
 **Card Details:**
 
-| Card | Tooltip | Calculation |
-|------|---------|-------------|
-| Total dependencies | All deps resolved (direct + transitive) | Count of all dependencies |
-| Vulnerabilities found | Deps with known CVEs | Count of vulnerable deps |
-| Critical | 10+ CVEs or critical severity | Based on CVE count |
-| High | 5-9 high severity CVEs | Based on CVE count |
-| Medium | 2-4 medium severity CVEs | Based on CVE count |
-| Low | 0-1 low severity CVEs | Based on CVE count |
-| Overall risk score | 0-100, higher = more risk | Critical-dominance algorithm |
+| Card | Meaning | Follows filters? |
+|------|---------|------------------|
+| Total dependencies | Dependencies in the current view | Yes |
+| Vulnerabilities found | Dependencies with at least one known vulnerability (not the number of CVEs) | Yes |
+| Critical | Dependencies with 10+ known vulnerabilities | Yes |
+| High | Backend risk level HIGH (score 70+) | Yes |
+| Medium | Backend risk level MEDIUM (score 40-69) | Yes |
+| Low | Backend risk level LOW, including dependencies without vulnerabilities | Yes |
+| **Overall risk score** | 0-100 for the **whole project**: highest dependency score plus up to +5 for other vulnerable dependencies | **No** |
+
+**Overall risk score and filters.** The overall risk score and the status chip (top right) always describe the whole project. Applying a filter or a search changes the findings list and the count tiles, but **not** the overall score. While a filter or search is active, a **"Filtered view: N"** line appears under the overall score with the score of just the visible findings. See [Risk Scoring](../architecture/risk-scoring.md).
 
 #### Confidence Badge
 Located in the top-right of the card:
@@ -213,6 +233,8 @@ Three badges explaining confidence levels:
 
 6. **Findings Count**
    - Shows "X of Y findings" (filtered vs total)
+
+**What filters change:** the findings table, the count tiles and the severity distribution follow the filters and search. The **overall risk score and status chip do not**; a "Filtered view: N" line under the overall score shows the score of the visible findings.
 
 #### Findings Table
 

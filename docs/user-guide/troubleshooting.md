@@ -405,23 +405,47 @@ curl https://api.openai.com/v1/models \
 **Symptoms**: Score doesn't match expectations
 
 **Understanding the Algorithm**:
-- **Current view only**: Score reflects filtered results, not total project
-- **Critical dominance**: 2 critical vulnerabilities minimum score of 60
-- **Weighted formula**: Critical(40) + High(30) + Medium(15) + Low(5)
+- **Whole project**: the overall score and the status chip do not change with filters or search. A "Filtered view: N" line under the score shows the score of the visible findings
+- **Overall score** = highest per-dependency risk score + 1 point per additional vulnerable dependency (max +5), capped at 100
+- **Per-dependency score**: base 20, +25 per known vulnerability (max +60), plus maintenance/adoption factors; 70+ = High, 40-69 = Medium, 20-39 = Low
 
 **Examples**:
-| Findings | Expected Score |
-|----------|----------------|
-| 2 Critical | 60 (minimum floor) |
-| 1 Critical + 2 High | 60 (critical boost) |
-| 3 High + 5 Medium | 39 (weighted sum) |
-| 0 vulnerabilities | 0 |
+| Project | Overall Score |
+|---------|---------------|
+| Riskiest dependency scores 80, 9 vulnerable dependencies | 85 (80 + 5) |
+| Riskiest dependency scores 55, one vulnerable dependency | 55 |
+| No known vulnerabilities, riskiest dependency scores 35 | 35 |
+| No dependencies | 0 |
 
 **Debugging**:
-1. Check you're viewing the right filter set
-2. Count actual critical/high/medium/low in table
-3. Apply formula manually to verify
-4. Check console for calculation logs
+1. Open the details of the riskiest finding; its risk score is the base of the overall score
+2. Count the dependencies with known vulnerabilities (the "Vulnerabilities found" tile with no filter applied)
+3. If a number changes when you filter, it is a count tile (expected) or the "Filtered view" line, not the overall score
+
+#### Browse button: file dialog is hidden or nothing happens
+**Symptoms**: Clicking **Browse...** shows "File dialog open..." but no dialog appears
+
+**Solutions**:
+1. Press Alt+Tab or check the taskbar: the dialog may be behind the browser
+2. Run BuildAegis on the machine you are using; the dialog opens on the machine running the backend
+3. If the server has no display, an in-page folder browser opens instead
+4. As a fallback, type or paste the path into the Project path box
+
+#### Analyze Dependencies button is disabled
+**Symptoms**: A path is in the box but the button cannot be clicked
+
+**Solutions**:
+1. Make sure the Project path box is not empty
+2. Pick the path with **Browse...** (it enables the button) or type in the box
+3. The button is also disabled while an analysis is running
+
+#### PDF export fails
+**Symptoms**: "Export failed" when exporting a PDF while JSON works
+
+**Solutions**:
+1. Update to the latest version: older builds sent an Accept: application/json header that the PDF endpoint rejected with 406 Not Acceptable
+2. If calling the API yourself, send Accept: application/pdf (or */*)
+3. With an empty project path, the export contains all cached results
 
 ### Build Tool Specific Issues
 

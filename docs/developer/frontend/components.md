@@ -62,7 +62,9 @@ This document describes the major UI components as they exist in `index.html`, a
 - Hover tooltips are provided using the `data-tooltip` attribute.
 
 **Important behavior:**
-- KPI counts + overall risk score reflect the **current view** (i.e., filtered findings).
+- KPI **counts** reflect the **current view** (i.e., filtered findings).
+- `#kpiOverallRisk` (overall risk score) and the status chip reflect the **whole project** and do not change with filters.
+- `#kpiOverallNote` is hidden unless a filter/search is active; then it shows "Filtered view: N" (the score of the visible findings).
 
 ### Confidence Badge
 **Markup:** `#confidenceBadge`

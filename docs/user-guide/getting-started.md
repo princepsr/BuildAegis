@@ -55,28 +55,27 @@ Once complete, you'll see:
 | **High** | 5-9 high severity CVEs |
 | **Medium** | 2-4 medium severity CVEs |
 | **Low** | 0-1 low severity CVEs |
-| **Overall risk score** | 0-100 score representing current view risk |
+| **Overall risk score** | 0-100 score for the whole project (not changed by filters) |
 
 ### Risk Score Interpretation
 
-The risk score (0-100) uses a **critical-dominance algorithm**:
+The overall risk score (0-100) is the **highest per-dependency risk score** in the project, plus 1 point for each additional dependency with known vulnerabilities (up to +5):
 
-- **0-20**: Low risk - No critical vulnerabilities
-- **21-40**: Medium risk - May have 1 critical vulnerability
-- **41-60**: High risk - Multiple critical vulnerabilities or many highs
-- **61-90**: Critical risk - Several critical vulnerabilities
-- **91-100**: Severe risk - Many critical vulnerabilities
+- **70-100**: High - at least one dependency is high risk (for example several known vulnerabilities)
+- **40-69**: Medium - vulnerable dependencies, none with a high score
+- **20-39**: Low - no known vulnerabilities, only maintenance or adoption concerns
+- **0-19**: Minimal or no results
 
-**Important**: The score is calculated from the **current filtered view**, not the entire project.
+**Important**: The overall score and the status chip describe the **whole project** and do **not** change when you filter or search. While a filter or search is active, a **"Filtered view: N"** line under the score shows the score of just the visible findings. The count tiles do follow the filters.
 
 ### Severity Classification
 
-| Severity | CVE Count | Risk Level |
-|----------|-----------|------------|
-| Critical | 10+ | Immediate attention required |
-| High | 5-9 | Address soon |
-| Medium | 2-4 | Plan to fix |
-| Low | 0-1 | Monitor |
+| Severity | How it is determined | Risk Level |
+|----------|----------------------|------------|
+| Critical | 10 or more known vulnerabilities | Immediate attention required |
+| High | Backend risk level HIGH (score 70+) | Address soon |
+| Medium | Backend risk level MEDIUM (score 40-69) | Plan to fix |
+| Low | Backend risk level LOW (score 20-39), including dependencies without vulnerabilities | Monitor |
 
 ## Using Filters
 

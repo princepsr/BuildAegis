@@ -1,155 +1,101 @@
-# Risk Scoring Algorithm
+# Risk Scoring
 
-This document defines how risk scores are computed and displayed in the current application.
+This document defines how risk scores, severities and the status chip are computed and displayed in the current application.
 
 ## Scope
 
-There are **two** risk scores shown in the UI:
+There are **three** related values in the UI:
 
-1. **Overall risk score** (KPI card)
-2. **Per-finding risk score** (shown in the details modal)
+1. **Per-dependency risk score** (0-100) and risk level, calculated by the **backend** (`DeterministicRiskCalculator`).
+2. **Severity** of each finding (Critical / High / Medium / Low), derived on the **frontend** from the backend risk level.
+3. **Overall risk score** (KPI card) and the **status chip**, computed on the **frontend** from the per-dependency scores.
 
-This document primarily describes the **Overall risk score** calculation, which is implemented on the **frontend**.
+## Per-Dependency Risk Score (Backend)
 
-## Key Principle: Score Represents the Current View
+Calculated deterministically by `DeterministicRiskCalculator` (AI is never used for the score, only for the explanation):
 
-The **Overall risk score represents the current view**.
+| Factor | Effect on score |
+|---|---|
+| Base | starts at **20** |
+| Known vulnerabilities | **+25 per vulnerability**, capped at **+60** |
+| No activity for over 2 years / over 1 year | +15 / +10 |
+| Open issues over 200 / over 50 | +10 / +5 |
+| GitHub stars under 10 / under 100 | +10 / +5 |
 
-That means:
-- The score is computed from the **currently visible** findings after filters/search are applied.
-- If you filter to only Critical findings, the score is computed using only those findings.
-- This is intentional: it makes the KPI match the user’s current focus.
+The score is capped at 100 and mapped to a risk level:
 
-## Inputs
+| Score | Risk level |
+|---|---|
+| 70 and above | HIGH |
+| 40-69 | MEDIUM |
+| 20-39 | LOW |
+| below 20 | UNKNOWN |
 
-The algorithm takes a summary of the current view:
+Example: a dependency with one known vulnerability scores 45-55 (MEDIUM); with two it scores about 70 (HIGH).
 
-- `critical` = number of CRITICAL findings
-- `high` = number of HIGH findings
-- `medium` = number of MEDIUM findings
-- `low` = number of LOW findings
+## Severity of a Finding (Frontend)
 
-These counts are derived from mapped findings (dependencies), not raw CVE entries.
+The severity shown in the table, the severity filter and the Critical/High/Medium/Low tiles is:
 
-## Severity Classification (Frontend)
+1. **CRITICAL** if the dependency has **10 or more** known vulnerabilities.
+2. Otherwise the backend risk level: **HIGH**, **MEDIUM** or **LOW**.
+3. Only if the backend gives no usable risk level, the vulnerability count is used as a fallback: 5+ = HIGH, 2+ = MEDIUM, otherwise LOW.
 
-The frontend classifies severity primarily from vulnerability count per dependency:
+A dependency with no known vulnerabilities is normally LOW.
 
-- **CRITICAL**: 10+ vulnerabilities
-- **HIGH**: 5–9 vulnerabilities
-- **MEDIUM**: 2–4 vulnerabilities
-- **LOW**: 0–1 vulnerabilities
+## Overall Risk Score (KPI Card)
 
-This classification is applied during mapping of backend DTOs into frontend findings.
+The **Overall risk score** describes the **whole project**, not the current view.
 
-## Overall Risk Score Algorithm
-
-### 1) Weighted Base Score
-
-Compute a base score using weighted counts:
-
-- Critical: **40** points each
-- High: **30** points each
-- Medium: **15** points each
-- Low: **5** points each
-
-Pseudo:
-
-```js
-base = 40*critical + 30*high + 15*medium + 5*low
+```text
+overall = min(100, highestDependencyScore + min(5, vulnerableDependencies - 1))
 ```
 
-### 2) Critical Dominance Boost
+- `highestDependencyScore` is the highest per-dependency risk score (see above) among **all** analyzed dependencies.
+- `vulnerableDependencies` is the number of dependencies with at least one known vulnerability. Each one beyond the first adds **1 point**, up to **+5**.
+- With no dependencies the score is **0**.
 
-Critical findings dominate the overall risk score.
+The overall score is therefore never lower than the score of the riskiest dependency, so it always agrees with the per-dependency scores shown in the details dialog.
 
-The algorithm enforces guardrails (minimum floors) based on critical count:
+### Example
 
-- If `critical >= 3` → minimum score = **90**
-- Else if `critical == 2` → minimum score = **60**
-- Else if `critical == 1` → minimum score = **40**
+A project with 219 dependencies, 9 of them vulnerable, whose riskiest dependency scores 80:
+`overall = 80 + min(5, 9 - 1) = 85`.
 
-Pseudo:
+## Filters Do Not Change the Overall Score
 
-```js
-if (critical >= 3) score = max(score, 90)
-else if (critical === 2) score = max(score, 60)
-else if (critical === 1) score = max(score, 40)
-```
+Filtering and searching only change **which findings are listed** and the **count tiles**. They do **not** change the overall risk score or the status chip.
 
-### 3) Normalization & Capping
+| Element | Follows the filter/search? |
+|---|---|
+| Findings table and "Showing X of Y findings" | Yes |
+| Count tiles: Total dependencies, Vulnerabilities found, Critical, High, Medium, Low | Yes |
+| **Overall risk score** | **No** - always the whole project |
+| **Status chip** (top right) | **No** - always the whole project |
+| **Filtered view** line under the score | Shown only while a filter or search is active |
 
-- The final score is capped at **100**.
-- The final score is floored at **0**.
+While a filter or search is active, a line **"Filtered view: N"** appears under the overall score. `N` is calculated with the same formula as the overall score, but only from the visible findings. For example, with the filter set to High, the overall score can stay at 85 while "Filtered view" shows 70.
 
-Pseudo:
+This is intentional: the overall score answers "how risky is this project?", and the filtered-view line answers "how risky is what I am looking at?". Showing a different number in the overall card when filtering would be misleading.
 
-```js
-score = Math.max(0, Math.min(100, score))
-```
+## Status Chip
 
-### 4) Empty Results
+The chip always reflects the whole project:
 
-If there are no findings (total = 0), the score should be **0**.
+- No dependencies: **No Issues**
+- Any Critical finding: **Critical Issues**
+- Else any High finding: **High Risk**
+- Else any Medium finding: **Medium Risk**
+- Else: **Low Risk**
 
-## Why This Model
+## Vulnerabilities Found Tile
 
-This model is designed to be:
+**Vulnerabilities found** counts the **dependencies that have at least one known vulnerability**, not the total number of CVEs and not the total number of dependencies. It follows the filter like the other count tiles.
 
-- **Intuitive**: higher count/severity → higher score
-- **Non-linear for criticals**: even a small number of criticals should be treated as urgent
-- **Stable**: avoids tiny scores when criticals exist
-- **Fast**: computed in constant time from summary counts
+## Related
 
-## Examples
-
-### Example A: 0 findings
-- critical=0, high=0, medium=0, low=0
-- score = 0
-
-### Example B: 1 critical only
-- base = 40
-- floor = 40
-- score = 40
-
-### Example C: 2 critical only
-- base = 80
-- floor = 60
-- score = 80
-
-### Example D: 2 critical + 2 high + 2 low
-- base = 2*40 + 2*30 + 2*5 = 80 + 60 + 10 = 150
-- cap at 100 → score = 100
-
-### Example E: 0 critical, 3 high, 4 medium
-- base = 3*30 + 4*15 = 90 + 60 = 150
-- cap at 100 → score = 100
-
-## Per-Finding Risk Score
-
-A per-finding risk score is displayed in the modal.
-
-Source:
-- Usually comes from backend `DependencyRiskDto.riskScore` (AI-derived or computed),
-- Or is derived/mapped during frontend transformation.
-
-If the backend provides an explicit `riskScore`, the UI should display it as-is.
-
-## Status Chip Logic
-
-The status chip uses the same severity thresholds:
-
-- If total == 0 → “No Issues”
-- Else if critical > 0 → “Critical Issues”
-- Else if high > 0 → “High Risk”
-- Else if medium > 0 → “Medium Risk”
-- Else → “Low Risk”
-
-**Note:** status reflects the **current view** because it is computed from the filtered summary.
-
----
-
-Related docs:
-- `docs/developer/frontend/architecture.md`
 - `docs/user-guide/features.md`
-- `src/main/resources/static/app.js`
+- `docs/user-guide/ui-guide.md`
+- `docs/developer/frontend/architecture.md`
+- `src/main/resources/static/app.js` (`riskScoreFor`, `updateSummary`, `mapProjectResultsToFindings`)
+- `src/main/java/com/riskscanner/dependencyriskanalyzer/service/ai/DeterministicRiskCalculator.java`
