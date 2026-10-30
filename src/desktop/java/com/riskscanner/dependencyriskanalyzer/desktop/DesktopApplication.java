@@ -28,6 +28,7 @@ public class DesktopApplication extends Application {
     @Override
     public void init() {
         springContext = new SpringApplicationBuilder(BuildAegisApplication.class)
+                .headless(false)
                 .properties(
                         "server.port=8080",
                         "spring.main.web-application-type=servlet"
