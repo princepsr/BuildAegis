@@ -1,5 +1,6 @@
 package com.riskscanner.dependencyriskanalyzer.controller;
 
+import java.util.Map;
 import com.riskscanner.dependencyriskanalyzer.dto.AiSettingsRequest;
 import com.riskscanner.dependencyriskanalyzer.dto.AiSettingsResponse;
 import com.riskscanner.dependencyriskanalyzer.service.AIAnalysisService;
@@ -44,8 +45,8 @@ public class AiSettingsController {
      * Runs a small request against the provider to validate the configuration.
      */
     @PostMapping("/test-connection")
-    public String testConnection() {
+    public Map<String, String> testConnection() {
         aiAnalysisService.testConnection();
-        return "OK";
+        return Map.of("status", "OK");
     }
 }
