@@ -65,6 +65,11 @@ public class DefaultAIExplanationService implements AIExplanationService {
             // In a future iteration, we could add a dedicated "explain" method to AiClient
             AiClient.DependencyRiskAnalysisResult result = client.analyzeDependencyRisk(dependency, enrichment);
             
+            // Some clients report failures as an UNKNOWN result carrying the error text instead of throwing
+            if (result.riskLevel() == com.riskscanner.dependencyriskanalyzer.model.RiskLevel.UNKNOWN && result.riskScore() == null) {
+                throw new IllegalStateException(result.explanation());
+            }
+
             // Override with deterministic values to ensure AI doesn't change risk assessment
             return new ExplanationResult(
                     result.explanation(),
@@ -72,9 +77,25 @@ public class DefaultAIExplanationService implements AIExplanationService {
                     true
             );
         } catch (Exception e) {
-            // Fall back gracefully if AI fails
-            return fallbackService.explainRisk(dependency, enrichment, deterministicRiskLevel, deterministicRiskScore);
+            // Fall back gracefully if AI fails, and tell the user why the explanation is not AI-generated
+            var fallback = fallbackService.explainRisk(dependency, enrichment, deterministicRiskLevel, deterministicRiskScore);
+            return new ExplanationResult(describeFailure(e) + "\n\n" + fallback.explanation(), fallback.recommendations(), false);
         }
+    }
+
+    private static String describeFailure(Exception e) {
+        StringBuilder messages = new StringBuilder();
+        for (Throwable t = e; t != null; t = t.getCause()) {
+            if (t.getMessage() != null) {
+                messages.append(t.getMessage()).append(' ');
+            }
+        }
+        String text = messages.toString().toLowerCase();
+        if (text.contains("429") || text.contains("rate limit") || text.contains("too many requests")) {
+            return "AI explanation unavailable: the AI provider rate limit was reached (HTTP 429). "
+                    + "Showing the standard explanation instead; re-run the analysis later to get an AI explanation.";
+        }
+        return "AI explanation unavailable: the AI provider request failed. Showing the standard explanation instead.";
     }
 
     @Override

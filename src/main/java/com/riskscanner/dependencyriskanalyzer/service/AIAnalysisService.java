@@ -138,7 +138,8 @@ public class AIAnalysisService {
                 riskResult.riskLevel(),
                 riskResult.riskScore(),
                 explanationResult.explanation(),
-                explanationResult.recommendations()
+                explanationResult.recommendations(),
+                explanationResult.fromAI()
         );
     }
 
@@ -149,7 +150,16 @@ public class AIAnalysisService {
             com.riskscanner.dependencyriskanalyzer.model.RiskLevel riskLevel,
             Integer riskScore,
             String explanation,
-            List<String> recommendations
+            List<String> recommendations,
+            boolean fromAI
     ) {
+        public DependencyRiskAnalysisResult(
+                com.riskscanner.dependencyriskanalyzer.model.RiskLevel riskLevel,
+                Integer riskScore,
+                String explanation,
+                List<String> recommendations
+        ) {
+            this(riskLevel, riskScore, explanation, recommendations, true);
+        }
     }
 }

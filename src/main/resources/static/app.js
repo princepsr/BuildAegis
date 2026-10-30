@@ -1128,9 +1128,9 @@ const BuildAegis = (() => {
   // Exporter Service
   const Exporter = {
     async exportJSON() {
-      const projectPath = DOM.get('buildFileContent')?.value.trim();
-      if (!projectPath) {
-        UI.showError('Please enter a project path first');
+      const projectPath = DOM.get('buildFileContent')?.value.trim() || '';
+      if (!projectPath && State.allFindings.length === 0) {
+        UI.showError('Please enter a project path or load cached results first');
         return;
       }
 
@@ -1140,7 +1140,7 @@ const BuildAegis = (() => {
         const response = await fetch(`${API.BASE_URL}${API.ENDPOINTS.EXPORT_JSON}`, {
           method: 'POST',
           headers: API.HEADERS,
-          body: JSON.stringify({ projectPath, forceRefresh: false })
+          body: JSON.stringify({ projectPath, forceRefresh: false, aiEnabled: State.settings.aiEnabled })
         });
 
         if (!response.ok) throw new Error('Export failed');
@@ -1163,9 +1163,9 @@ const BuildAegis = (() => {
     },
 
     async exportPDF() {
-      const projectPath = DOM.get('buildFileContent')?.value.trim();
-      if (!projectPath) {
-        UI.showError('Please enter a project path first');
+      const projectPath = DOM.get('buildFileContent')?.value.trim() || '';
+      if (!projectPath && State.allFindings.length === 0) {
+        UI.showError('Please enter a project path or load cached results first');
         return;
       }
 
@@ -1175,7 +1175,7 @@ const BuildAegis = (() => {
         const response = await fetch(`${API.BASE_URL}${API.ENDPOINTS.EXPORT_PDF}`, {
           method: 'POST',
           headers: API.HEADERS,
-          body: JSON.stringify({ projectPath, forceRefresh: false })
+          body: JSON.stringify({ projectPath, forceRefresh: false, aiEnabled: State.settings.aiEnabled })
         });
 
         if (!response.ok) throw new Error('Export failed');

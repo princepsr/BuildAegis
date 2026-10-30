@@ -42,7 +42,7 @@ public class PdfExportService {
             Font normal = FontFactory.getFont(FontFactory.HELVETICA, 10);
 
             document.add(new Paragraph("Risk Scanner Report", title));
-            document.add(new Paragraph("Project: " + response.projectPath(), normal));
+            document.add(new Paragraph("Project: " + (response.projectPath() == null || response.projectPath().isBlank() ? "(cached results)" : response.projectPath()), normal));
             document.add(new Paragraph("Analyzed At: " + response.analyzedAt(), normal));
             document.add(new Paragraph(" "));
 
@@ -54,7 +54,8 @@ public class PdfExportService {
             table.addCell(new Phrase("Score", FontFactory.getFont(FontFactory.HELVETICA_BOLD, 10)));
             table.addCell(new Phrase("Explanation", FontFactory.getFont(FontFactory.HELVETICA_BOLD, 10)));
 
-            for (DependencyRiskDto r : response.results()) {
+            java.util.List<DependencyRiskDto> rows = response.results() == null ? java.util.List.of() : response.results();
+            for (DependencyRiskDto r : rows) {
                 String dep = r.groupId() + ":" + r.artifactId() + ":" + r.version();
                 table.addCell(new Phrase(dep, normal));
                 table.addCell(new Phrase(String.valueOf(r.riskLevel()), normal));
