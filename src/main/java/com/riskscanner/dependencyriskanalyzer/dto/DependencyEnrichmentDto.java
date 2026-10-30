@@ -23,6 +23,7 @@ public record DependencyEnrichmentDto(
         String githubRepo,
         Integer githubStars,
         Integer githubOpenIssues,
-        Instant githubLastPushedAt
+        Instant githubLastPushedAt,
+        String suggestedFixVersion
 ) {
 }
