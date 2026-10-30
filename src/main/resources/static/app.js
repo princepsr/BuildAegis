@@ -346,11 +346,42 @@ const BuildAegis = (() => {
         }
       };
 
-      DOM.on(DOM.get('browseProjectPath'), 'click', async () => {
+      const openInPage = async () => {
         DOM.show(modal);
         const typed = DOM.get('buildFileContent')?.value.trim() || '';
         // If the typed path is not a valid folder, start from the top level instead
         if (!(await load(typed))) await load('');
+      };
+
+      // Prefer the operating system's file dialog; fall back to the in-page browser when it is unavailable
+      const browseBtn = DOM.get('browseProjectPath');
+      DOM.on(browseBtn, 'click', async () => {
+        if (browseBtn.disabled) return;
+        const typed = DOM.get('buildFileContent')?.value.trim() || '';
+        const label = browseBtn.querySelector('span:last-child');
+        const originalLabel = label ? label.textContent : '';
+        browseBtn.disabled = true;
+        if (label) label.textContent = 'File dialog open...';
+        let useFallback = false;
+        try {
+          const response = await fetch(`${API.BASE_URL}/system/browse?initial=${encodeURIComponent(typed)}`, {
+            method: 'POST',
+            headers: API.HEADERS
+          });
+          if (response.status === 204) return; // cancelled
+          if (response.ok) {
+            const data = await response.json();
+            DOM.get('buildFileContent').value = data.path;
+            return;
+          }
+          useFallback = true;
+        } catch (error) {
+          useFallback = true;
+        } finally {
+          browseBtn.disabled = false;
+          if (label) label.textContent = originalLabel;
+        }
+        if (useFallback) await openInPage();
       });
       DOM.on(upBtn, 'click', () => load(current.parent || ''));
       DOM.on(selectBtn, 'click', () => choose(current.path));
