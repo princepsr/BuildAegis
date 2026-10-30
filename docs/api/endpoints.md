@@ -7,7 +7,7 @@ Base URL (local dev): `http://localhost:8080/buildaegis`
 ## Conventions
 
 - Requests/Responses use JSON unless otherwise specified.
-- Errors are returned as non-2xx HTTP status codes with a JSON body (shape may vary).
+- Errors are returned as non-2xx HTTP status codes with a JSON body `{"error": "short message"}`. Bad input or missing configuration gives `400`; other failures give `500`. Messages are single-line, length-limited and have anything that looks like an API key removed. Stack traces and exception class names are never returned.
 - Some endpoints depend on configured AI settings (provider/model).
 - Timestamps (for example `analyzedAt`) are ISO-8601 strings, e.g. `2026-02-05T12:00:00Z`.
 - The UI sends `Accept: application/json`; endpoints that return a file (PDF export) must be called with a matching `Accept` header (`application/pdf` or `*/*`), otherwise the server answers `406 Not Acceptable`.
@@ -54,7 +54,11 @@ Notes:
         "vulnerabilityCount": 5,
         "vulnerabilityIds": ["CVE-..."],
         "ecosystem": "Maven",
-        "suggestedFixVersion": "1.2.9"
+        "suggestedFixVersion": "1.2.9",
+        "maxSeverity": "HIGH",
+        "severityCounts": { "HIGH": 2, "MEDIUM": 3 },
+        "knownExploited": false,
+        "maxEpssScore": 0.04
       }
     }
   ],
@@ -62,6 +66,13 @@ Notes:
   "timestamp": "2026-02-05T12:00:00"
 }
 ```
+
+**Enrichment fields** (all optional, `null` when unknown):
+- `maxSeverity`: highest advisory severity (`CRITICAL`, `HIGH`, `MEDIUM`, `LOW`), from CVSS or the advisory's own label
+- `severityCounts`: number of vulnerabilities per severity
+- `knownExploited`: true if a vulnerability is in the CISA Known Exploited Vulnerabilities catalog
+- `maxEpssScore`: highest EPSS exploit probability (0-1) among the vulnerabilities
+- `suggestedFixVersion`: smallest version fixing all known vulnerabilities
 
 ### GET `/api/project/scan?projectPath=...`
 
@@ -110,6 +121,30 @@ Request fields:
 - `model`
 - `apiKey`
 - `customEndpoint` (required when `provider` is `custom`)
+
+**API key:** responses never contain the stored key. `apiKey` is returned masked (for example `********wxyz`, or `null` when none is saved). When saving, sending the masked value or an empty `apiKey` keeps the stored key; sending a new key replaces it. `apiKey` is required the first time.
+
+### POST `/api/ai/ask`
+
+Answers a question about one finding using only the details in the request (no source code is sent to the AI).
+
+**Body:**
+
+```json
+{
+  "dependency": "org.apache.tomcat.embed:tomcat-embed-core:10.1.34",
+  "severity": "CRITICAL",
+  "vulnerabilityCount": 11,
+  "vulnerabilityIds": ["CVE-2025-24813"],
+  "knownExploited": true,
+  "fixVersion": "10.1.36",
+  "explanation": "...",
+  "recommendations": ["..."],
+  "question": "Am I affected if I only serve static files?"
+}
+```
+
+**Response:** `{"answer": "..."}`. `question` is required and at most 500 characters. Returns `400` if AI is not configured or the question is invalid. Rate limits are retried.
 
 ### POST `/api/ai/test-connection`
 
