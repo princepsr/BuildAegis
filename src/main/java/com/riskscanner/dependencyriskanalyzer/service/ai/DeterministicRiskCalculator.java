@@ -5,6 +5,8 @@ import com.riskscanner.dependencyriskanalyzer.model.DependencyCoordinate;
 import com.riskscanner.dependencyriskanalyzer.model.RiskLevel;
 import org.springframework.stereotype.Service;
 
+import java.util.Map;
+
 import java.time.LocalDate;
 import java.time.Period;
 import java.time.format.DateTimeFormatter;
@@ -40,8 +42,29 @@ public class DeterministicRiskCalculator {
         if (enrichment != null && enrichment.vulnerabilityCount() != null) {
             int vulnCount = enrichment.vulnerabilityCount();
             if (vulnCount > 0) {
-                score += Math.min(vulnCount * 25, 60); // Cap at 60 points from vulnerabilities
-                rationale.append("Has ").append(vulnCount).append(" known vulnerabilities. ");
+                score += vulnerabilityPoints(enrichment, vulnCount);
+                rationale.append("Has ").append(vulnCount).append(" known vulnerabilities");
+                if (enrichment.maxSeverity() != null) {
+                    rationale.append(" (highest severity ").append(enrichment.maxSeverity()).append(")");
+                }
+                rationale.append(". ");
+            }
+        }
+
+        // Exploit data: vulnerabilities that are actually being attacked matter more than theoretical ones
+        boolean knownExploited = enrichment != null && Boolean.TRUE.equals(enrichment.knownExploited());
+        if (knownExploited) {
+            score += 25;
+            rationale.append("Exploited in the wild (CISA KEV). ");
+        }
+        if (enrichment != null && enrichment.maxEpssScore() != null) {
+            double epss = enrichment.maxEpssScore();
+            if (epss >= 0.5) {
+                score += 10;
+                rationale.append("High exploit probability (EPSS ").append(Math.round(epss * 100)).append("%). ");
+            } else if (epss >= 0.1) {
+                score += 5;
+                rationale.append("Elevated exploit probability (EPSS ").append(Math.round(epss * 100)).append("%). ");
             }
         }
 
@@ -94,11 +117,51 @@ public class DeterministicRiskCalculator {
 
         // Cap score at 100
         score = Math.min(score, 100);
+        if (knownExploited) {
+            score = Math.max(score, KNOWN_EXPLOITED_FLOOR);
+        }
 
         // Determine risk level
         RiskLevel riskLevel = determineRiskLevel(score);
 
         return new RiskResult(riskLevel, score, rationale.toString());
+    }
+
+    /** Points added per vulnerability, by severity. */
+    private static final int CRITICAL_POINTS = 55;
+    private static final int HIGH_POINTS = 40;
+    private static final int MEDIUM_POINTS = 20;
+    private static final int LOW_POINTS = 8;
+    /** Vulnerabilities without severity information are treated like medium ones. */
+    private static final int UNKNOWN_SEVERITY_POINTS = 20;
+    private static final int MAX_VULNERABILITY_POINTS = 75;
+    /** A dependency with a vulnerability that is exploited in the wild is never scored below this. */
+    private static final int KNOWN_EXPLOITED_FLOOR = 90;
+
+    /**
+     * Points for known vulnerabilities, weighted by their real severity when available; otherwise the old
+     * count-based rule (25 per vulnerability, at most 60) is used.
+     */
+    private int vulnerabilityPoints(DependencyEnrichmentDto enrichment, int vulnCount) {
+        Map<String, Integer> counts = enrichment.severityCounts();
+        if (counts == null || counts.isEmpty()) {
+            return Math.min(vulnCount * 25, 60);
+        }
+
+        int points = 0;
+        int classified = 0;
+        for (Map.Entry<String, Integer> e : counts.entrySet()) {
+            int n = e.getValue() == null ? 0 : e.getValue();
+            classified += n;
+            points += n * switch (e.getKey()) {
+                case "CRITICAL" -> CRITICAL_POINTS;
+                case "HIGH" -> HIGH_POINTS;
+                case "LOW" -> LOW_POINTS;
+                default -> MEDIUM_POINTS;
+            };
+        }
+        points += Math.max(0, vulnCount - classified) * UNKNOWN_SEVERITY_POINTS;
+        return Math.min(points, MAX_VULNERABILITY_POINTS);
     }
 
     private RiskLevel determineRiskLevel(int score) {

@@ -43,7 +43,9 @@ BuildAegis provides comprehensive vulnerability analysis for Java projects. This
 Each dependency gets a deterministic risk score from the backend (AI is only used to write the explanation):
 
 - Starts at 20
-- +25 per known vulnerability (capped at +60)
+- Known vulnerabilities add points by their **real severity** (Critical +55, High +40, Medium +20, Low +8 each, capped at +75)
+- A vulnerability **exploited in the wild** (CISA KEV) adds 25 and keeps the score at 90 or above
+- A high exploit probability (EPSS) adds a few points
 - Small additions for long inactivity, a large open-issue backlog and low community adoption
 
 Score to risk level: **70+ = High**, **40-69 = Medium**, **20-39 = Low**.
@@ -52,8 +54,18 @@ Score to risk level: **70+ = High**, **40-69 = Medium**, **20-39 = Low**.
 
 The Critical / High / Medium / Low tiles, the severity column and the severity filter use:
 
-- **Critical**: the dependency has 10 or more known vulnerabilities
-- Otherwise the backend risk level (**High**, **Medium** or **Low**)
+- **Critical**: a vulnerability of the dependency is exploited in the wild (CISA KEV)
+- Otherwise the **highest advisory severity** of its vulnerabilities (from CVSS or GitHub's severity label)
+- Without severity data: 10 or more vulnerabilities is Critical, then the backend risk level
+
+#### Exploit Data (CISA KEV and EPSS)
+
+BuildAegis looks up two free data sources to prioritize vulnerabilities that are actually being attacked:
+
+- **CISA Known Exploited Vulnerabilities**: confirmed exploitation in the wild. Shown as "Exploited in the wild (CISA KEV)" in the finding details.
+- **EPSS**: the probability that a CVE is exploited in the next 30 days. Shown as "EPSS: 97%".
+
+Both are cached for 24 hours and are best-effort: if they cannot be reached, the analysis simply continues without them.
 
 #### Overall Risk Score (Whole Project)
 
@@ -78,7 +90,7 @@ For dependencies with known vulnerabilities, the recommendations include the **s
 - **Minor** upgrade: usually backward compatible; check release notes for deprecations and changed defaults
 - **Major** upgrade: expect breaking changes; review release notes and run your tests
 
-When AI is enabled, one extra short AI request per vulnerable dependency adds a summary of probable regressions. It is labeled as AI-generated and should be checked against the release notes. If that request fails, the rest of the result is unaffected.
+When AI is enabled, the same AI request that writes the explanation also summarizes the probable behavior changes of the upgrade. If the library's GitHub **release notes** for the fixed version can be found, they are given to the AI, so the summary is based on real changelog text; without release notes it is labeled as AI-generated without release notes. Always verify against the release notes before upgrading.
 
 ### 4. Confidence Levels
 
@@ -130,15 +142,32 @@ The UI now supports saving AI settings to the backend:
 - The model field must match the provider’s model identifier (e.g., `openai/gpt-oss-120b:free`).
 - Some OpenAI-compatible providers may return the assistant text in a non-standard field (e.g., `message.reasoning`). BuildAegis handles this best-effort.
 
+**Quick setup (Custom provider):** choose **Custom**, then pick a service under **Quick setup** (OpenRouter, Groq, Together AI, Mistral, DeepSeek, or LM Studio for a local server). It fills in the endpoint and a suggested model; then paste your API key. Model names change over time, so edit the model if the suggestion is out of date. For local servers that need no key, enter any text as the key.
+
 **Test Connection Behavior:**
 - "Test Connection" validates that the provider accepts the credentials + model + endpoint and returns a valid response envelope.
 - It does not require a specific response string (some models/providers may return empty `message.content` or reasoning-only output).
 
 **Security Notes:**
-- API keys are encrypted at rest when `buildaegis.encryption.secret` is configured
+- API keys are always encrypted at rest: with `buildaegis.encryption.secret` when it is set, otherwise with a key generated once and kept in `./data/buildaegis.key` (see [Security and Configuration](security-and-configuration.md))
 - Settings persist across browser sessions
 - Each provider+model combination is stored separately
-- Keys are never displayed in the UI after saving
+- The API never returns the stored key: the UI shows it masked (only the last four characters). Leave the masked value as it is to keep the stored key, or type a new key to replace it
+
+#### How AI Is Used (Requests, Retries, Cost)
+
+- **One request per dependency** that needs an explanation: the explanation, recommendations and upgrade behavior notes come from a single AI call.
+- **No AI request for clean dependencies**: dependencies without known vulnerabilities and with low risk get a template explanation, which saves requests and cost. This is cached like any other result.
+- **Rate limits are retried**: HTTP 429, overload (5xx) and timeouts are retried up to three times with increasing waits (a `Retry-After` hint is honored). If the provider still refuses, the explanation starts with a notice that AI was unavailable and the template explanation is shown.
+- **Stand-in explanations are not cached** as AI results, so a later analysis asks the AI again.
+- The risk level and score are never changed by the AI.
+
+#### Ask AI About a Finding
+
+Open a finding's details and use **Ask AI about this finding** (shown when AI is enabled) to ask a question such as "Is this exploitable if I only use the library for JSON parsing?".
+
+- The AI sees only that finding's details (dependency, severity, advisory ids, fix version, explanation and recommendations), **not your source code**. If the answer depends on how you use the library, it should say what to check.
+- Questions are limited to 500 characters. Answers can be wrong; verify before acting on them.
 
 #### AI Features
 

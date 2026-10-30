@@ -17,7 +17,11 @@ Calculated deterministically by `DeterministicRiskCalculator` (AI is never used 
 | Factor | Effect on score |
 |---|---|
 | Base | starts at **20** |
-| Known vulnerabilities | **+25 per vulnerability**, capped at **+60** |
+| Known vulnerabilities, weighted by the **real severity** of each | **Critical +55, High +40, Medium +20, Low +8** per vulnerability; total capped at **+75** |
+| Vulnerabilities without severity information (when others have it) | count as Medium (**+20** each) |
+| No severity information at all | older rule: **+25 per vulnerability**, capped at **+60** |
+| **Exploited in the wild** (CISA KEV) | **+25**, and the score is never below **90** |
+| High exploit probability (EPSS 50% or more / 10% or more) | +10 / +5 |
 | No activity for over 2 years / over 1 year | +15 / +10 |
 | Open issues over 200 / over 50 | +10 / +5 |
 | GitHub stars under 10 / under 100 | +10 / +5 |
@@ -31,15 +35,22 @@ The score is capped at 100 and mapped to a risk level:
 | 20-39 | LOW |
 | below 20 | UNKNOWN |
 
-Example: a dependency with one known vulnerability scores 45-55 (MEDIUM); with two it scores about 70 (HIGH).
+Examples: one Critical vulnerability scores 75 (HIGH); one High 60; one Medium 40; one Low 28; a Low-severity vulnerability that is exploited in the wild scores 90. Several Low-severity vulnerabilities do not outrank a single Critical one.
+
+## Where Severity and Exploit Data Come From
+
+- **Severity** comes from the OSV advisory of each vulnerability: GitHub's own label (`LOW`, `MODERATE`, `HIGH`, `CRITICAL`) when present, otherwise the CVSS v3.x base score computed from the vector (9.0+ Critical, 7.0-8.9 High, 4.0-6.9 Medium, below 4.0 Low). CVSS v4-only advisories carry no usable score and count as "unknown severity".
+- **Exploited in the wild** comes from the CISA Known Exploited Vulnerabilities (KEV) catalog, matched by CVE id (including aliases).
+- **EPSS** is the probability (0-100%) that a CVE will be exploited in the next 30 days, from the FIRST EPSS API.
+- KEV and EPSS data are cached for 24 hours. They are best-effort: if the services cannot be reached, those factors are simply missing and the analysis continues.
 
 ## Severity of a Finding (Frontend)
 
 The severity shown in the table, the severity filter and the Critical/High/Medium/Low tiles is:
 
-1. **CRITICAL** if the dependency has **10 or more** known vulnerabilities.
-2. Otherwise the backend risk level: **HIGH**, **MEDIUM** or **LOW**.
-3. Only if the backend gives no usable risk level, the vulnerability count is used as a fallback: 5+ = HIGH, 2+ = MEDIUM, otherwise LOW.
+1. **CRITICAL** if a vulnerability of the dependency is **exploited in the wild** (CISA KEV).
+2. Otherwise the **highest advisory severity** (Critical, High, Medium or Low) when the dependency has vulnerabilities and the severity is known.
+3. Without severity data: **CRITICAL** with **10 or more** known vulnerabilities, then the backend risk level (**HIGH**, **MEDIUM** or **LOW**), and as a last resort the vulnerability count (5+ = HIGH, 2+ = MEDIUM, otherwise LOW).
 
 A dependency with no known vulnerabilities is normally LOW.
 
@@ -99,3 +110,4 @@ The chip always reflects the whole project:
 - `docs/developer/frontend/architecture.md`
 - `src/main/resources/static/app.js` (`riskScoreFor`, `updateSummary`, `mapProjectResultsToFindings`)
 - `src/main/java/com/riskscanner/dependencyriskanalyzer/service/ai/DeterministicRiskCalculator.java`
+- `src/main/java/com/riskscanner/dependencyriskanalyzer/service/vulnerability/` (`OsvAdvisoryParser`, `Cvss3`, `ExploitDataService`)

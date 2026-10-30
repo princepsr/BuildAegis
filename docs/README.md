@@ -11,6 +11,8 @@ docs/
 │   ├── getting-started.md       # Quick start guide
 │   ├── features.md              # Feature overview and usage
 │   ├── ui-guide.md              # User interface explanation
+│   ├── cli-and-ci.md            # Command-line mode and CI pipelines
+│   ├── security-and-configuration.md  # Security defaults and settings
 │   └── troubleshooting.md       # Common issues and solutions
 ├── developer/                   # Developer documentation
 │   ├── backend/
@@ -35,6 +37,8 @@ docs/
 - **[Getting Started](user-guide/getting-started.md)** - First time setup and basic usage
 - **[Features Guide](user-guide/features.md)** - Understanding all features
 - **[UI Guide](user-guide/ui-guide.md)** - Interface walkthrough
+- **[Command Line and CI](user-guide/cli-and-ci.md)** - Run scans in a pipeline and fail the build on findings
+- **[Security and Configuration](user-guide/security-and-configuration.md)** - Defaults, key storage and settings
 
 ### For Developers
 - **[Backend Architecture](developer/backend/architecture.md)** - Understanding the backend
@@ -53,7 +57,7 @@ docs/
 The overall risk score is built from the **per-dependency risk scores** calculated by the backend:
 
 - **Overall score** = highest dependency score in the project + 1 point per additional vulnerable dependency (max +5), capped at 100
-- **Per-dependency score** (0-100): base 20, +25 per known vulnerability (max +60), plus small maintenance/adoption factors; 70+ = High, 40-69 = Medium, 20-39 = Low
+- **Per-dependency score** (0-100): base 20, plus points by the real severity of each vulnerability (Critical +55, High +40, Medium +20, Low +8; max +75), +25 and a floor of 90 for vulnerabilities exploited in the wild (CISA KEV), and small maintenance/adoption factors; 70+ = High, 40-69 = Medium, 20-39 = Low
 - **Whole project, not the current view**: filters and search do **not** change the overall score or status chip. While filtering, a "Filtered view: N" line shows the score of the visible findings
 - **Scale**: 0-100, where higher = more risk
 
@@ -79,7 +83,8 @@ src/main/resources/static/
 
 ### Supported Features
 - Maven and Gradle project analysis
-- OSV vulnerability database integration
+- OSV vulnerability database integration with real severity (CVSS / GitHub), CISA KEV and EPSS exploit data
+- Command-line mode with `--fail-on` for CI pipelines
 - AI-powered risk explanations (OpenAI, Claude, Gemini, Ollama, Azure)
 - Local caching of analysis results
 - Export to CSV
@@ -93,7 +98,8 @@ Previous documentation (especially `UI_DEVELOPMENT.md`) described a modular comp
 
 ### Security
 - All analysis happens locally
-- API keys are encrypted at rest (when encryption secret is configured)
+- API keys are always encrypted at rest (a local key file is generated when no secret is configured) and never returned by the API
+- The server listens on `127.0.0.1` only by default; the H2 console is off by default; errors never include stack traces
 - No code execution in safe mode (Maven)
 - Controlled execution for Gradle
 

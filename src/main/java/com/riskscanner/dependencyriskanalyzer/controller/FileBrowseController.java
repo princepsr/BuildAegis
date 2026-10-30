@@ -1,5 +1,6 @@
 package com.riskscanner.dependencyriskanalyzer.controller;
 
+import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -17,6 +18,8 @@ import java.awt.GraphicsEnvironment;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
+import java.net.InetAddress;
+import java.net.UnknownHostException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
@@ -67,12 +70,37 @@ public class FileBrowseController {
      * Lists the given directory; with no path, lists the home folder and the filesystem roots.
      */
     @GetMapping("/fs")
-    public ResponseEntity<?> list(@RequestParam(name = "path", required = false) String path) {
+    public ResponseEntity<?> list(@RequestParam(name = "path", required = false) String path, HttpServletRequest request) {
+        if (!isLoopback(request)) {
+            return forbidden();
+        }
         try {
             return ResponseEntity.ok(listDirectory(path));
         } catch (IllegalArgumentException | IOException e) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("error", e.getMessage()));
         }
+    }
+
+    /**
+     * These endpoints expose the local file system, so they only answer requests that come from this machine,
+     * even if the server was made reachable from the network.
+     */
+    static boolean isLoopback(HttpServletRequest request) {
+        String address = request == null ? null : request.getRemoteAddr();
+        if (address == null) {
+            return false;
+        }
+        try {
+            return InetAddress.getByName(address).isLoopbackAddress();
+        } catch (UnknownHostException e) {
+            return false;
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    private static <T> ResponseEntity<T> forbidden() {
+        return (ResponseEntity<T>) ResponseEntity.status(HttpStatus.FORBIDDEN)
+                .body(Map.of("error", "File browsing is only available from the machine running BuildAegis."));
     }
 
     /**
@@ -83,8 +111,11 @@ public class FileBrowseController {
      * unsupported system), in which case the UI falls back to the in-page folder browser.
      */
     @PostMapping("/browse")
-    public ResponseEntity<Map<String, String>> browse(@RequestParam(name = "initial", required = false) String initial)
-            throws Exception {
+    public ResponseEntity<Map<String, String>> browse(@RequestParam(name = "initial", required = false) String initial,
+                                                      HttpServletRequest request) throws Exception {
+        if (!isLoopback(request)) {
+            return forbidden();
+        }
         String chosen;
         if (System.getProperty("os.name", "").toLowerCase().contains("win")) {
             chosen = browseWindows(initial);

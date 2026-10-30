@@ -50,11 +50,11 @@ Once complete, you'll see:
 | Card | Description |
 |------|-------------|
 | **Total dependencies** | All dependencies found (direct + transitive) |
-| **Vulnerabilities found** | Dependencies with known CVEs |
-| **Critical** | 10+ CVEs or critical severity |
-| **High** | 5-9 high severity CVEs |
-| **Medium** | 2-4 medium severity CVEs |
-| **Low** | 0-1 low severity CVEs |
+| **Vulnerabilities found** | Dependencies with at least one known vulnerability |
+| **Critical** | A vulnerability is exploited in the wild (CISA KEV) or the highest advisory severity is Critical |
+| **High** | Highest advisory severity is High |
+| **Medium** | Highest advisory severity is Medium |
+| **Low** | Highest advisory severity is Low, or no known vulnerabilities |
 | **Overall risk score** | 0-100 score for the whole project (not changed by filters) |
 
 ### Risk Score Interpretation
@@ -72,10 +72,12 @@ The overall risk score (0-100) is the **highest per-dependency risk score** in t
 
 | Severity | How it is determined | Risk Level |
 |----------|----------------------|------------|
-| Critical | 10 or more known vulnerabilities | Immediate attention required |
-| High | Backend risk level HIGH (score 70+) | Address soon |
-| Medium | Backend risk level MEDIUM (score 40-69) | Plan to fix |
-| Low | Backend risk level LOW (score 20-39), including dependencies without vulnerabilities | Monitor |
+| Critical | Exploited in the wild (CISA KEV), or the highest advisory severity (CVSS 9.0+) is Critical | Immediate attention required |
+| High | Highest advisory severity is High (CVSS 7.0-8.9) | Address soon |
+| Medium | Highest advisory severity is Medium (CVSS 4.0-6.9) | Plan to fix |
+| Low | Highest advisory severity is Low, or no known vulnerabilities | Monitor |
+
+If the advisories carry no severity information, 10 or more vulnerabilities count as Critical and the backend risk level is used otherwise.
 
 ## Using Filters
 

@@ -2,6 +2,7 @@ package com.riskscanner.dependencyriskanalyzer.dto;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Optional metadata attached to a dependency.
@@ -24,6 +25,10 @@ public record DependencyEnrichmentDto(
         Integer githubStars,
         Integer githubOpenIssues,
         Instant githubLastPushedAt,
-        String suggestedFixVersion
+        String suggestedFixVersion,
+        String maxSeverity,
+        Map<String, Integer> severityCounts,
+        Boolean knownExploited,
+        Double maxEpssScore
 ) {
 }

@@ -171,6 +171,20 @@
                   <input class="form-input" id="aiApiKey" name="aiApiKey" type="password" placeholder="(stored encrypted if configured)" autocomplete="off">
                 </div>
 
+                <div class="form-row" id="aiPresetRow" hidden>
+                  <label class="form-label" for="aiPreset">Quick setup</label>
+                  <select class="form-select" id="aiPreset" name="aiPreset">
+                    <option value="">Choose a service...</option>
+                    <option value="openrouter">OpenRouter</option>
+                    <option value="groq">Groq</option>
+                    <option value="together">Together AI</option>
+                    <option value="mistral">Mistral</option>
+                    <option value="deepseek">DeepSeek</option>
+                    <option value="lmstudio">LM Studio (local, any API key)</option>
+                  </select>
+                  <p class="helper">Fills in the endpoint and a suggested model; then paste your API key. Model names change over time, edit the model if needed.</p>
+                </div>
+
                 <div class="form-row" id="customEndpointRow" hidden>
                   <label class="form-label" for="customEndpoint">Custom endpoint</label>
                   <input class="form-input" id="customEndpoint" name="customEndpoint" type="text" placeholder="e.g. https://api.example.com/v1" autocomplete="off">
@@ -486,6 +500,7 @@
           <span class="pill" id="detailsConfidence">Confidence: --</span>
           <span class="pill" id="detailsDirectness">--</span>
           <span class="pill" id="detailsSource">Source: --</span>
+          <span class="pill" id="detailsExploit" hidden></span>
         </div>
 
         <section class="details-section" aria-labelledby="descTitle">
@@ -509,6 +524,17 @@
             <span class="explain-badge" id="detailsExplainType">--</span>
           </div>
           <p class="details-section__text" id="detailsExplanation">--</p>
+        </section>
+
+        <section class="details-section" id="askSection" aria-labelledby="askTitle" hidden>
+          <h4 class="details-section__title" id="askTitle">Ask AI about this finding</h4>
+          <div class="ask-row">
+            <input type="text" class="form-input" id="askQuestion" maxlength="500" autocomplete="off"
+                   placeholder="e.g. Is this exploitable if I only use the library for JSON parsing?">
+            <button type="button" class="btn btn--ghost" id="askSubmit">Ask</button>
+          </div>
+          <p class="details-section__text" id="askAnswer" role="status" hidden></p>
+          <p class="helper">AI answers can be wrong. The AI sees only this finding's details, not your code.</p>
         </section>
 
         <section class="details-section details-section--actions" aria-labelledby="suppressTitle">

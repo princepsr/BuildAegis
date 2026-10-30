@@ -179,9 +179,9 @@ public class ProjectAnalysisService {
             entity.setRecommendationsJson(objectMapper.writeValueAsString(analysis.recommendations()));
             entity.setEnrichmentJson(objectMapper.writeValueAsString(enrichment));
             entity.setAnalyzedAt(Instant.now());
-            // Don't cache fallback explanations produced because the AI call failed (e.g. rate limited),
-            // otherwise they would be served later as if they were AI results.
-            if (!aiEnabled || analysis.fromAI()) {
+            // Don't cache stand-in explanations produced because the AI call failed (e.g. rate limited) or AI was not
+            // configured, otherwise they would be served later as if they were AI results.
+            if (!aiEnabled || analysis.cacheable()) {
                 cacheRepository.save(entity);
             }
 

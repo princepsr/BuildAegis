@@ -62,7 +62,7 @@ public class GeminiClient implements AiClient {
                     }]
                   }]
                 }
-                """, prompt.replace("\"", "\\\"").replace("\n", "\\n"));
+                """, JsonText.escape(prompt));
         
         HttpRequest request = HttpRequest.newBuilder()
                 .uri(URI.create("https://generativelanguage.googleapis.com/v1beta/models/" + model + ":generateContent?key=" + apiKey))

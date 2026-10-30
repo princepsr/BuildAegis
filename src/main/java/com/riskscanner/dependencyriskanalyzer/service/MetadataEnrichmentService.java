@@ -4,6 +4,8 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.riskscanner.dependencyriskanalyzer.dto.DependencyEnrichmentDto;
 import com.riskscanner.dependencyriskanalyzer.model.DependencyCoordinate;
+import com.riskscanner.dependencyriskanalyzer.service.vulnerability.ExploitDataService;
+import com.riskscanner.dependencyriskanalyzer.service.vulnerability.OsvAdvisoryParser;
 import org.springframework.stereotype.Service;
 
 import java.net.URI;
@@ -34,11 +36,13 @@ import java.util.List;
 public class MetadataEnrichmentService {
 
     private final ObjectMapper objectMapper;
-    private final HttpClient httpClient;
+    /** Created on first use, so constructing the service needs no network stack. */
+    private volatile HttpClient httpClient;
+    private final ExploitDataService exploitDataService;
 
-    public MetadataEnrichmentService(ObjectMapper objectMapper) {
+    public MetadataEnrichmentService(ObjectMapper objectMapper, ExploitDataService exploitDataService) {
+        this.exploitDataService = exploitDataService;
         this.objectMapper = objectMapper;
-        this.httpClient = HttpClient.newHttpClient();
     }
 
     /**
@@ -64,6 +68,10 @@ public class MetadataEnrichmentService {
                     null,
                     null,
                     null,
+                    null,
+                    null,
+                    null,
+                    null,
                     null
             );
         }
@@ -71,7 +79,8 @@ public class MetadataEnrichmentService {
         String ecosystem = "Maven";
         String packageName = dependency.groupId() + ":" + dependency.artifactId();
 
-        OsvResult osv = queryOsv(ecosystem, packageName, dependency.version());
+        OsvAdvisoryParser.Summary osv = queryOsv(ecosystem, packageName, dependency.version());
+        ExploitDataService.ExploitInfo exploit = exploitDataService.lookup(osv.cveIds());
         ScmResult scm = fetchScmFromMavenCentralPom(dependency.groupId(), dependency.artifactId(), dependency.version());
 
         GithubResult gh = null;
@@ -83,18 +92,35 @@ public class MetadataEnrichmentService {
                 ecosystem,
                 packageName,
                 dependency.version(),
-                osv.vulnerabilityCount,
-                osv.vulnerabilityIds,
+                osv.vulnerabilityCount(),
+                osv.vulnerabilityIds(),
                 scm.scmUrl,
                 scm.githubRepo,
                 gh == null ? null : gh.stars,
                 gh == null ? null : gh.openIssues,
                 gh == null ? null : gh.lastPushedAt,
-                osv.suggestedFixVersion
+                osv.suggestedFixVersion(),
+                osv.maxSeverity(),
+                osv.severityCounts().isEmpty() ? null : osv.severityCounts(),
+                osv.vulnerabilityCount() == null ? null : exploit.knownExploited(),
+                exploit.maxEpss()
         );
     }
 
-    private OsvResult queryOsv(String ecosystem, String packageName, String version) {
+    private HttpClient client() {
+        HttpClient c = httpClient;
+        if (c == null) {
+            synchronized (this) {
+                if (httpClient == null) {
+                    httpClient = HttpClient.newHttpClient();
+                }
+                c = httpClient;
+            }
+        }
+        return c;
+    }
+
+    private OsvAdvisoryParser.Summary queryOsv(String ecosystem, String packageName, String version) {
         try {
             String body = "{\"package\":{\"ecosystem\":\"" + ecosystem + "\",\"name\":\"" + escapeJson(packageName) + "\"},\"version\":\"" + escapeJson(version) + "\"}";
             HttpRequest request = HttpRequest.newBuilder()
@@ -104,36 +130,13 @@ public class MetadataEnrichmentService {
                     .POST(HttpRequest.BodyPublishers.ofString(body))
                     .build();
 
-            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+            HttpResponse<String> response = client().send(request, HttpResponse.BodyHandlers.ofString());
             if (response.statusCode() / 100 != 2) {
-                return new OsvResult(null, List.of(), null);
+                return OsvAdvisoryParser.Summary.unknown();
             }
-
-            JsonNode root = objectMapper.readTree(response.body());
-            JsonNode vulns = root.path("vulns");
-            if (!vulns.isArray()) {
-                return new OsvResult(0, List.of(), null);
-            }
-
-            List<List<String>> fixedPerVuln = new ArrayList<>();
-            for (JsonNode v : vulns) {
-                fixedPerVuln.add(extractFixedVersions(v, packageName));
-            }
-            String suggested = UpgradeAdvisor.suggestFixVersion(version, fixedPerVuln);
-
-            List<String> ids = new ArrayList<>();
-            for (JsonNode v : vulns) {
-                String id = v.path("id").asText(null);
-                if (id != null) {
-                    ids.add(id);
-                }
-                if (ids.size() >= 8) {
-                    break;
-                }
-            }
-            return new OsvResult(vulns.size(), ids, suggested);
+            return OsvAdvisoryParser.parse(objectMapper.readTree(response.body()), packageName, version);
         } catch (Exception e) {
-            return new OsvResult(null, List.of(), null);
+            return OsvAdvisoryParser.Summary.unknown();
         }
     }
 
@@ -149,7 +152,7 @@ public class MetadataEnrichmentService {
                     .GET()
                     .build();
 
-            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+            HttpResponse<String> response = client().send(request, HttpResponse.BodyHandlers.ofString());
             if (response.statusCode() / 100 != 2) {
                 return new ScmResult(null, null);
             }
@@ -176,7 +179,7 @@ public class MetadataEnrichmentService {
                     .GET()
                     .build();
 
-            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+            HttpResponse<String> response = client().send(request, HttpResponse.BodyHandlers.ofString());
             if (response.statusCode() / 100 != 2) {
                 return null;
             }
@@ -237,26 +240,6 @@ public class MetadataEnrichmentService {
     private String escapeJson(String s) {
         return s.replace("\\", "\\\\").replace("\"", "\\\"");
     }
-
-    private List<String> extractFixedVersions(JsonNode vuln, String packageName) {
-        List<String> fixed = new ArrayList<>();
-        for (JsonNode affected : vuln.path("affected")) {
-            if (!packageName.equals(affected.path("package").path("name").asText())) {
-                continue;
-            }
-            for (JsonNode range : affected.path("ranges")) {
-                for (JsonNode event : range.path("events")) {
-                    String f = event.path("fixed").asText(null);
-                    if (f != null) {
-                        fixed.add(f);
-                    }
-                }
-            }
-        }
-        return fixed;
-    }
-
-    private record OsvResult(Integer vulnerabilityCount, List<String> vulnerabilityIds, String suggestedFixVersion) {}
 
     private record ScmResult(String scmUrl, String githubRepo) {}
 

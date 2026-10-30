@@ -1,5 +1,11 @@
 package com.riskscanner.dependencyriskanalyzer.service;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.nio.file.attribute.PosixFilePermissions;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
@@ -23,8 +29,12 @@ import java.util.Base64;
  *
  * <p>Operational notes:
  * <ul>
- *   <li>If {@code buildaegis.encryption.secret} is blank, values are stored in plaintext.</li>
- *   <li>If values were stored encrypted and the secret is later removed/changed, decryption will fail.</li>
+ *   <li>If {@code buildaegis.encryption.secret} is blank, a random key is generated once and kept in the file
+ *   {@code buildaegis.encryption.key-file} (default {@code ./data/buildaegis.key}), readable only by the current user
+ *   where the platform allows it. Keep that file with the database: without it, stored keys cannot be decrypted.</li>
+ *   <li>Only if that file cannot be created are values stored in plaintext (a warning is logged).</li>
+ *   <li>If values were stored encrypted and the secret/key file is later removed/changed, decryption will fail.</li>
+ *   <li>Values stored in plaintext by older versions stay readable (each stored value records whether it is encrypted).</li>
  * </ul>
  */
 @Service
@@ -35,11 +45,77 @@ public class CryptoService {
 
     private final SecureRandom secureRandom = new SecureRandom();
 
+    private static final Logger log = LoggerFactory.getLogger(CryptoService.class);
+
     @Value("${buildaegis.encryption.secret:}")
     private String encryptionSecret;
 
+    @Value("${buildaegis.encryption.key-file:./data/buildaegis.key}")
+    private String keyFile;
+
+    /** Resolved lazily: the configured secret, or the generated key from the key file; null if neither is available. */
+    private volatile String effectiveSecret;
+    private volatile boolean secretResolved;
+
     public boolean isEncryptionConfigured() {
-        return encryptionSecret != null && !encryptionSecret.isBlank();
+        return secret() != null;
+    }
+
+    private String secret() {
+        if (!secretResolved) {
+            synchronized (this) {
+                if (!secretResolved) {
+                    effectiveSecret = resolveSecret();
+                    secretResolved = true;
+                }
+            }
+        }
+        return effectiveSecret;
+    }
+
+    private String resolveSecret() {
+        if (encryptionSecret != null && !encryptionSecret.isBlank()) {
+            return encryptionSecret;
+        }
+        if (keyFile == null || keyFile.isBlank()) {
+            return null;
+        }
+        try {
+            Path path = Paths.get(keyFile);
+            if (Files.isRegularFile(path)) {
+                String existing = Files.readString(path, StandardCharsets.UTF_8).trim();
+                if (!existing.isEmpty()) {
+                    return existing;
+                }
+            }
+            byte[] random = new byte[32];
+            secureRandom.nextBytes(random);
+            String generated = Base64.getEncoder().encodeToString(random);
+
+            if (path.getParent() != null) {
+                Files.createDirectories(path.getParent());
+            }
+            Files.writeString(path, generated, StandardCharsets.UTF_8);
+            restrictToOwner(path);
+            log.info("Generated a local encryption key file at {}. Keep it together with the database.", path.toAbsolutePath());
+            return generated;
+        } catch (Exception e) {
+            log.warn("Could not read or create the encryption key file '{}'; API keys will NOT be encrypted: {}", keyFile, e.toString());
+            return null;
+        }
+    }
+
+    private static void restrictToOwner(Path path) {
+        try {
+            Files.setPosixFilePermissions(path, PosixFilePermissions.fromString("rw-------"));
+        } catch (UnsupportedOperationException | java.io.IOException e) {
+            // Not a POSIX file system (Windows): fall back to the basic owner-only flags
+            java.io.File f = path.toFile();
+            f.setReadable(false, false);
+            f.setReadable(true, true);
+            f.setWritable(false, false);
+            f.setWritable(true, true);
+        }
     }
 
     public String encrypt(String plaintext) {
@@ -51,7 +127,7 @@ public class CryptoService {
             secureRandom.nextBytes(iv);
 
             Cipher cipher = Cipher.getInstance("AES/GCM/NoPadding");
-            cipher.init(Cipher.ENCRYPT_MODE, secretKeyFromSecret(encryptionSecret), new GCMParameterSpec(GCM_TAG_LENGTH_BITS, iv));
+            cipher.init(Cipher.ENCRYPT_MODE, secretKeyFromSecret(secret()), new GCMParameterSpec(GCM_TAG_LENGTH_BITS, iv));
             byte[] ciphertext = cipher.doFinal(plaintext.getBytes(StandardCharsets.UTF_8));
 
             byte[] combined = new byte[iv.length + ciphertext.length];
@@ -79,7 +155,7 @@ public class CryptoService {
             System.arraycopy(combined, IV_LENGTH_BYTES, ciphertext, 0, ciphertext.length);
 
             Cipher cipher = Cipher.getInstance("AES/GCM/NoPadding");
-            cipher.init(Cipher.DECRYPT_MODE, secretKeyFromSecret(encryptionSecret), new GCMParameterSpec(GCM_TAG_LENGTH_BITS, iv));
+            cipher.init(Cipher.DECRYPT_MODE, secretKeyFromSecret(secret()), new GCMParameterSpec(GCM_TAG_LENGTH_BITS, iv));
             byte[] plaintext = cipher.doFinal(ciphertext);
 
             return new String(plaintext, StandardCharsets.UTF_8);
