@@ -553,7 +553,7 @@ const BuildAegis = (() => {
       
       // Update summary (from filtered findings for KPI counts)
       const summary = this.computeSummary(findings);
-      this.updateSummary(summary, State.allFindings);
+      this.updateSummary(summary, findings);
       
       // Render findings
       this.renderFindings(findings);
@@ -562,6 +562,15 @@ const BuildAegis = (() => {
       DOM.toggle(DOM.get('overviewEmpty'), !hasFindings);
       DOM.toggle(DOM.get('overviewContent'), hasFindings);
       
+      // Results meta line under the heading
+      const metaEl = DOM.get('resultsMeta');
+      if (metaEl) {
+        const vulnerable = findings.filter(f => (f.vulnerabilityCount || 0) > 0).length;
+        metaEl.textContent = hasFindings
+          ? `${findings.length} dependencies analyzed, ${vulnerable} with known vulnerabilities.`
+          : 'No results loaded.';
+      }
+
       // Findings count - show filtered vs total when filtering
       const countEl = DOM.get('findingsCount');
       if (countEl) {
@@ -623,6 +632,9 @@ const BuildAegis = (() => {
 
       const countEl = DOM.get('findingsCount');
       if (countEl) countEl.textContent = '0 findings';
+
+      const metaEl = DOM.get('resultsMeta');
+      if (metaEl) metaEl.textContent = 'No results loaded.';
 
       // Reset Analysis section
       this.updateAnalysisSection([], { critical: 0, high: 0, medium: 0, low: 0 });
@@ -732,7 +744,7 @@ const BuildAegis = (() => {
       }
     },
     
-    updateSummary(summary) {
+    updateSummary(summary, findings = []) {
       const { critical = 0, high = 0, medium = 0, low = 0 } = summary;
 
       const total = critical + high + medium + low;
@@ -742,7 +754,9 @@ const BuildAegis = (() => {
       DOM.setText(DOM.get('kpiMedium'), medium);
       DOM.setText(DOM.get('kpiLow'), low);
       DOM.setText(DOM.get('kpiTotalDependencies'), total);
-      DOM.setText(DOM.get('kpiVulnsFound'), total);
+      // Dependencies with at least one known vulnerability (not the total dependency count)
+      const vulnerable = findings.filter(f => (f.vulnerabilityCount || 0) > 0).length;
+      DOM.setText(DOM.get('kpiVulnsFound'), vulnerable);
       
       // Calculate Overall Risk Score from CURRENT VIEW (filtered findings)
       const riskScore = this.calculateRealisticRiskScore(critical, high, medium, low);
