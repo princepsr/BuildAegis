@@ -1459,6 +1459,10 @@ const BuildAegis = (() => {
   // Initialize the application
   return {
     init() {
+      // The desktop wrapper renders with JavaFX's software pipeline, so skip costly visual effects there
+      if (/JavaFX/i.test(navigator.userAgent)) {
+        document.documentElement.classList.add('lite');
+      }
       // Load saved settings
       State.loadSettings();
 
