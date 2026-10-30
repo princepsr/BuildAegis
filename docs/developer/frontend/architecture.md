@@ -74,7 +74,8 @@ State responsibilities:
 
 Important behavioral detail:
 - The **current view** is `State.filteredFindings`.
-- KPIs and overall risk score are rendered based on that current view (see `UI.updateSummary`).
+- The count tiles (Total, Vulnerabilities found, Critical, High, Medium, Low) are rendered from the current view.
+- The **overall risk score and the status chip are rendered from the whole project** (`State.allFindings`), so filters never change them. While a filter/search is active, `#kpiOverallNote` shows "Filtered view: N", the same calculation applied to `State.filteredFindings` (see `UI.updateSummary` and `UI.riskScoreFor`).
 
 ### 3) UI
 
@@ -152,7 +153,7 @@ The mapping from backend DTOs happens in `mapProjectResultsToFindings` (and rela
    - Table rows
    - KPI counts
    - Analysis distribution
-   - Overall risk score (current view)
+   - Overall risk score and status chip (whole project, not filtered) plus the "Filtered view" line
 
 Filters:
 - **Severity**: exact match (unless “all”)
@@ -163,7 +164,8 @@ Filters:
 ## Risk Score on the Frontend
 
 The frontend displays:
-- **Overall risk score** in KPI card: computed from the **current view** (filtered summary).
+- **Overall risk score** in KPI card: computed from **all** findings (`State.allFindings`); filters do not change it.
+- **Filtered view** line under it: the same calculation for the visible findings, shown only while a filter/search is active.
 - **Per-finding risk score** inside the details modal.
 
 The algorithm is documented in `docs/architecture/risk-scoring.md`.

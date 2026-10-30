@@ -38,35 +38,47 @@ BuildAegis provides comprehensive vulnerability analysis for Java projects. This
 
 ### 3. Risk Scoring System
 
-#### Current Algorithm (Critical-Dominance Model)
+#### Per-Dependency Score (0-100)
 
-The risk score (0-100) is calculated using a weighted approach with critical dominance:
+Each dependency gets a deterministic risk score from the backend (AI is only used to write the explanation):
 
-**Base Weights:**
-- Critical: 40 points each
-- High: 30 points each
-- Medium: 15 points each
-- Low: 5 points each
+- Starts at 20
+- +25 per known vulnerability (capped at +60)
+- Small additions for long inactivity, a large open-issue backlog and low community adoption
 
-**Critical Boosts (non-linear):**
-- 1 Critical: Minimum 40 (even if weighted sum is lower)
-- 2 Critical: Minimum 60
-- 3+ Critical: Minimum 90
+Score to risk level: **70+ = High**, **40-69 = Medium**, **20-39 = Low**.
 
-**Normalization:**
-- Maximum cap: 100
-- Applied to current filtered view (not total project)
+#### Severity Shown in the UI
+
+The Critical / High / Medium / Low tiles, the severity column and the severity filter use:
+
+- **Critical**: the dependency has 10 or more known vulnerabilities
+- Otherwise the backend risk level (**High**, **Medium** or **Low**)
+
+#### Overall Risk Score (Whole Project)
+
+The **Overall risk score** card is the highest per-dependency score in the project, plus 1 point for each additional dependency with known vulnerabilities (up to +5), capped at 100.
+
+**Filters and search do not change the overall score or the status chip.** They only change the findings list and the count tiles. While a filter or search is active, a **"Filtered view: N"** line under the overall score shows the same calculation for just the visible findings. See [Risk Scoring](../architecture/risk-scoring.md) for details and an example.
 
 #### Risk Score Interpretation
 
-| Score Range | Risk Level | Action Required |
-|-------------|------------|-----------------|
-| 0 | None | No action needed |
-| 1-30 | Low | Monitor |
-| 31-40 | Medium | Plan remediation |
-| 41-60 | High | Address soon |
-| 61-90 | Critical | Immediate attention |
-| 91-100 | Severe | Urgent action required |
+| Score Range | Meaning | Action |
+|-------------|---------|--------|
+| 70-100 | High | Address soon / immediately |
+| 40-69 | Medium | Plan remediation |
+| 20-39 | Low | Monitor |
+| 0-19 | Minimal / none | No action needed |
+
+#### Upgrade Guidance
+
+For dependencies with known vulnerabilities, the recommendations include the **smallest known version that fixes all reported vulnerabilities** (taken from OSV fix data), together with the expected size of the behavior change:
+
+- **Patch** upgrade: behavior changes are unlikely
+- **Minor** upgrade: usually backward compatible; check release notes for deprecations and changed defaults
+- **Major** upgrade: expect breaking changes; review release notes and run your tests
+
+When AI is enabled, one extra short AI request per vulnerable dependency adds a summary of probable regressions. It is labeled as AI-generated and should be checked against the release notes. If that request fails, the rest of the result is unaffected.
 
 ### 4. Confidence Levels
 
@@ -181,7 +193,8 @@ No configuration required. The app automatically selects the best available Grad
 #### Severity Filter
 - All, Critical, High, Medium, Low
 - Filter by risk level
-- Updates KPI cards and risk score for current view
+- Updates the findings list and the count tiles (Total, Vulnerabilities found, Critical, High, Medium, Low)
+- Does **not** change the overall risk score or status chip; a "Filtered view: N" line shows the score of the visible findings while a filter is active
 
 #### Directness Filter
 - **All**: Show both direct and transitive
@@ -251,6 +264,14 @@ Aggregated remediation advice from all findings:
 - Results stored in local H2 database
 - Cache key: `groupId + artifactId + version + AI provider + AI model`
 - Same dependency + different provider = separate cache entries
+
+#### Load Cached Results
+- The cache is keyed by dependency, so it is shared between projects
+- Each analysis also records which dependencies belong to which project (and whether each is direct or transitive in that project)
+- **Load Cached with a project path in the box** shows only that project's cached results (folder or its build file, e.g. `C:/proj` and `C:/proj/pom.xml` are the same project)
+- **Load Cached with an empty path** shows every cached result
+- A project shows cached results only after it has been analyzed once with this version; until then you see "No cached results found for this project"
+- Direct/transitive labels in cached results come from the project's last analysis
 
 #### Cache Benefits
 - Instant results for previously analyzed dependencies
