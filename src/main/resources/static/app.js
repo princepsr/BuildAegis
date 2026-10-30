@@ -1127,6 +1127,17 @@ const BuildAegis = (() => {
         exploitEl.hidden = parts.length === 0;
         exploitEl.classList.toggle('pill--danger', !!finding.knownExploited);
       }
+      // Suggested fix: only shown when a fixed version is known
+      const fixSection = DOM.get('detailsFixSection');
+      if (fixSection) {
+        fixSection.hidden = !finding.suggestedFixVersion;
+        DOM.setText(DOM.get('detailsFix'), finding.suggestedFixVersion ? `Upgrade to ${finding.suggestedFixVersion}` : '--');
+        const fixNoteEl = DOM.get('detailsFixNote');
+        if (fixNoteEl) {
+          fixNoteEl.textContent = finding.fixNote || '';
+          fixNoteEl.hidden = !finding.fixNote;
+        }
+      }
       DOM.setText(DOM.get('detailsDescription'), finding.description || '--');
       DOM.setText(DOM.get('detailsAffected'), finding.affectedVersions || '--');
       DOM.setText(DOM.get('detailsPath'), finding.dependencyPath || '--');
@@ -1342,6 +1353,7 @@ const BuildAegis = (() => {
           knownExploited: knownExploited,
           epssScore: r.enrichment?.maxEpssScore ?? null,
           suggestedFixVersion: r.enrichment?.suggestedFixVersion || null,
+          fixNote: r.enrichment?.fixNote || null,
           riskScore: r.riskScore || 0,
           buildTool: r.buildTool
         };

@@ -407,7 +407,7 @@ curl https://api.openai.com/v1/models \
 **Understanding the Algorithm**:
 - **Whole project**: the overall score and the status chip do not change with filters or search. A "Filtered view: N" line under the score shows the score of the visible findings
 - **Overall score** = highest per-dependency risk score + 1 point per additional vulnerable dependency (max +5), capped at 100
-- **Per-dependency score**: base 20, plus points by the real severity of each vulnerability (Critical +55, High +40, Medium +20, Low +8; max +75), +25 and a floor of 90 for a vulnerability exploited in the wild (CISA KEV), and maintenance/adoption factors; 70+ = High, 40-69 = Medium, 20-39 = Low
+- **Per-dependency score**: base 20, plus points for the most severe vulnerability (Critical +55, High +40, Medium +20, Low +8) plus +3 for each additional one (max +15 extra, max +65 in total), +25 and a floor of 90 for a vulnerability exploited in the wild (CISA KEV), and maintenance/adoption factors; 70+ = High, 40-69 = Medium, 20-39 = Low
 
 **Examples**:
 | Project | Overall Score |
