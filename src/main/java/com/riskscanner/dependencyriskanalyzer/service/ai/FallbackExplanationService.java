@@ -102,7 +102,8 @@ public class FallbackExplanationService implements AIExplanationService {
             }
         }
 
-        return new ExplanationResult(explanation.toString(), recommendations, false);
+        // A template explanation is deterministic, so it is valid to cache; callers that wanted AI override this
+        return new ExplanationResult(explanation.toString(), recommendations, false, true);
     }
 
     @Override

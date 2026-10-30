@@ -60,7 +60,7 @@ public class OllamaClient implements AiClient {
                   "prompt": "%s",
                   "stream": false
                 }
-                """, model, prompt.replace("\"", "\\\"").replace("\n", "\\n"));
+                """, model, JsonText.escape(prompt));
         
         HttpRequest request = HttpRequest.newBuilder()
                 .uri(URI.create(baseUrl + "/api/generate"))
@@ -165,7 +165,7 @@ public class OllamaClient implements AiClient {
                     "num_predict": 600
                   }
                 }
-                """.formatted(model, systemMessage.replace("\"", "\\\""), prompt.toString().replace("\"", "\\\""));
+                """.formatted(model, JsonText.escape(systemMessage), JsonText.escape(prompt.toString()));
     }
 
     private String parseOllamaTextResponse(String json) {

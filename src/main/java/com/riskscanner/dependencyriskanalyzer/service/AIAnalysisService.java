@@ -139,7 +139,8 @@ public class AIAnalysisService {
                 riskResult.riskScore(),
                 explanationResult.explanation(),
                 explanationResult.recommendations(),
-                explanationResult.fromAI()
+                explanationResult.fromAI(),
+                explanationResult.cacheable()
         );
     }
 
@@ -151,7 +152,8 @@ public class AIAnalysisService {
             Integer riskScore,
             String explanation,
             List<String> recommendations,
-            boolean fromAI
+            boolean fromAI,
+            boolean cacheable
     ) {
         public DependencyRiskAnalysisResult(
                 com.riskscanner.dependencyriskanalyzer.model.RiskLevel riskLevel,
@@ -159,7 +161,7 @@ public class AIAnalysisService {
                 String explanation,
                 List<String> recommendations
         ) {
-            this(riskLevel, riskScore, explanation, recommendations, true);
+            this(riskLevel, riskScore, explanation, recommendations, true, true);
         }
     }
 }

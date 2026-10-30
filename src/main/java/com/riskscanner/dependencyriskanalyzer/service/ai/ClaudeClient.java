@@ -64,7 +64,7 @@ public class ClaudeClient implements AiClient {
                     {"role": "user", "content": "%s"}
                   ]
                 }
-                """, model, prompt.replace("\"", "\\\"").replace("\n", "\\n"));
+                """, model, JsonText.escape(prompt));
         
         HttpRequest request = HttpRequest.newBuilder()
                 .uri(URI.create("https://api.anthropic.com/v1/messages"))
@@ -174,7 +174,7 @@ public class ClaudeClient implements AiClient {
                     {"role": "user", "content": "%s"}
                   ]
                 }
-                """.formatted(model, systemMessage.replace("\"", "\\\""), prompt.toString().replace("\"", "\\\""));
+                """.formatted(model, JsonText.escape(systemMessage), JsonText.escape(prompt.toString()));
     }
 
     private String parseClaudeTextResponse(String json) {
