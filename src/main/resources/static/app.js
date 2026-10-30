@@ -304,8 +304,14 @@ const BuildAegis = (() => {
       let current = { path: '', parent: null };
 
       const close = () => DOM.hide(modal);
+      // Setting .value in code does not fire 'input', so tell the page the path changed (enables Analyze)
+      const setPath = (path) => {
+        const field = DOM.get('buildFileContent');
+        field.value = path;
+        field.dispatchEvent(new Event('input', { bubbles: true }));
+      };
       const choose = (path) => {
-        DOM.get('buildFileContent').value = path;
+        setPath(path);
         close();
       };
 
@@ -371,7 +377,7 @@ const BuildAegis = (() => {
           if (response.status === 204) return; // cancelled
           if (response.ok) {
             const data = await response.json();
-            DOM.get('buildFileContent').value = data.path;
+            setPath(data.path);
             return;
           }
           useFallback = true;
@@ -1165,12 +1171,17 @@ const BuildAegis = (() => {
         UI.showLoading(true, 'Loading cached results...');
         UI.clearResults();
 
-        const response = await API.request(API.ENDPOINTS.CACHED_RESULTS, {
+        // With a project path, only that project's cached results are shown; without one, everything cached
+        const projectPath = DOM.get('buildFileContent')?.value.trim() || '';
+        const query = projectPath ? `?projectPath=${encodeURIComponent(projectPath)}` : '';
+        const response = await API.request(`${API.ENDPOINTS.CACHED_RESULTS}${query}`, {
           method: 'GET'
         });
 
         if (!response || response.length === 0) {
-          UI.showError('No cached results found. Run a new analysis first.');
+          UI.showError(projectPath
+            ? 'No cached results found for this project. Run a new analysis first.'
+            : 'No cached results found. Run a new analysis first.');
           return;
         }
 
