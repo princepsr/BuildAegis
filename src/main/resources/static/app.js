@@ -323,6 +323,19 @@ const BuildAegis = (() => {
         this.updateUI();
       });
       
+      // Project path file chooser
+      DOM.on(DOM.get('browseProjectPath'), 'click', async () => {
+        try {
+          const response = await fetch(`${API.BASE_URL}/system/browse`, { method: 'POST', headers: API.HEADERS });
+          if (response.status === 204) return;
+          const data = await response.json().catch(() => ({}));
+          if (!response.ok) throw new Error(data.error || 'Unable to open the file chooser');
+          DOM.get('buildFileContent').value = data.path;
+        } catch (error) {
+          UI.showError(error.message);
+        }
+      });
+
       // AI Settings buttons
       DOM.on(DOM.get('saveAISettings'), 'click', () => AISettings.save());
       DOM.on(DOM.get('testAIConnection'), 'click', () => AISettings.test());
