@@ -145,5 +145,8 @@ public class DesktopApplication extends Application {
 
     public static void main(String[] args) {
         launch(args);
+        // launch() returns after stop(); exit explicitly so lingering non-daemon threads (and the
+        // plugin's -805306369 exit code on Windows) don't make a normal quit look like a failure
+        System.exit(0);
     }
 }
