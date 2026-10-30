@@ -325,6 +325,12 @@ const BuildAegis = (() => {
       
       // Project path file chooser
       DOM.on(DOM.get('browseProjectPath'), 'click', async () => {
+        const browseBtn = DOM.get('browseProjectPath');
+        if (browseBtn.disabled) return;
+        browseBtn.disabled = true;
+        const label = browseBtn.querySelector('span:last-child');
+        const originalLabel = label ? label.textContent : '';
+        if (label) label.textContent = 'Waiting for file dialog...';
         try {
           const response = await fetch(`${API.BASE_URL}/system/browse`, { method: 'POST', headers: API.HEADERS });
           if (response.status === 204) return;
@@ -333,6 +339,9 @@ const BuildAegis = (() => {
           DOM.get('buildFileContent').value = data.path;
         } catch (error) {
           UI.showError(error.message);
+        } finally {
+          browseBtn.disabled = false;
+          if (label) label.textContent = originalLabel;
         }
       });
 
@@ -759,7 +768,10 @@ const BuildAegis = (() => {
       DOM.setText(DOM.get('kpiVulnsFound'), vulnerable);
       
       // Calculate Overall Risk Score from CURRENT VIEW (filtered findings)
-      const riskScore = this.calculateRealisticRiskScore(critical, high, medium, low);
+      // Clean (zero-vulnerability) dependencies are not risk and must not add to the score
+      const lowWithVulns = findings.filter(f =>
+        String(f.severity).toUpperCase() === 'LOW' && (f.vulnerabilityCount || 0) > 0).length;
+      const riskScore = this.calculateRealisticRiskScore(critical, high, medium, lowWithVulns);
       DOM.setText(DOM.get('kpiOverallRisk'), riskScore);
       
       // Update overall status based on current view
@@ -1102,10 +1114,13 @@ const BuildAegis = (() => {
 
         const vulnerabilityCount = r.enrichment?.vulnerabilityCount || 0;
 
-        // Calculate severity based on vulnerability count (not just backend riskLevel)
-        // Critical: 10+, High: 5-9, Medium: 2-4, Low: 0-1
+        // Severity follows the backend risk level so the table, KPIs and overall score agree with each other.
+        // 10+ known vulnerabilities escalates to CRITICAL. Without a usable backend level, fall back to the count:
+        // High: 5+, Medium: 2+, Low: otherwise
+        const backendLevel = String(r.riskLevel || '').toUpperCase();
         let severity;
         if (vulnerabilityCount >= 10) severity = 'CRITICAL';
+        else if (['HIGH', 'MEDIUM', 'LOW'].includes(backendLevel)) severity = backendLevel;
         else if (vulnerabilityCount >= 5) severity = 'HIGH';
         else if (vulnerabilityCount >= 2) severity = 'MEDIUM';
         else severity = 'LOW';
