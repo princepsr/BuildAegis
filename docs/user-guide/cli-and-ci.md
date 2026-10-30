@@ -20,6 +20,7 @@ In this mode the application starts **without a web server**, scans the project,
 | `--buildaegis.cli.fail-on` | `high` | Lowest severity that fails the scan: `none`, `low`, `medium`, `high` or `critical` |
 | `--buildaegis.cli.format` | `text` | `text` (console report) or `json` (full results and summary) |
 | `--buildaegis.cli.output` | (console) | Write the report to this file instead of the console |
+| `--buildaegis.cli.allow-unchecked` | `false` | Pass even if some dependencies could not be checked for vulnerabilities (see below) |
 
 Any normal Spring option also works, for example `--spring.datasource.url=jdbc:h2:mem:ci` to use an in-memory database (recommended in CI so nothing is left on the runner).
 
@@ -29,7 +30,13 @@ Any normal Spring option also works, for example `--spring.datasource.url=jdbc:h
 |---|---|
 | `0` | Passed: no finding at or above the threshold (or `fail-on=none`) |
 | `1` | Failed: at least one dependency with known vulnerabilities is at or above the threshold |
-| `2` | The scan could not run (bad path, invalid option, resolution failure). Never treated as a pass |
+| `2` | The scan could not run (bad path, invalid option, resolution failure), **or it was incomplete**: some dependencies could not be checked for vulnerabilities. Never treated as a pass |
+
+### Incomplete scans
+
+A security gate must not pass on data it could not get. If the vulnerability source (OSV) is unreachable, or the build tool is not supported by the vulnerability lookup, those dependencies are counted as **unchecked**. The report then says `WARNING: N of M dependencies could not be checked ...` and ends with `Result: INCOMPLETE`, and the exit code is `2` (unless findings already fail the scan with `1`).
+
+Fix the cause (network access, supported build tool), or pass `--buildaegis.cli.allow-unchecked=true` if you knowingly accept it. With `--buildaegis.cli.fail-on=none` no gate is applied, so unchecked dependencies only produce the warning.
 
 ## What counts as a finding
 
@@ -49,6 +56,14 @@ Findings at or above HIGH: 2
   CRITICAL g:tomcat-embed-core:10.1.34  vulnerabilities=11  risk=80  fix=10.1.36
   HIGH     g:logback-core:1.5.16  vulnerabilities=2  risk=70
 Result: FAILED
+```
+
+When some dependencies could not be checked:
+
+```text
+WARNING: 94 of 94 dependencies could not be checked for vulnerabilities (vulnerability source unreachable, or build tool not supported).
+Findings at or above HIGH: 0
+Result: INCOMPLETE (94 dependencies could not be checked)
 ```
 
 ## GitHub Actions example
@@ -90,4 +105,4 @@ With `--buildaegis.cli.format=json` the report contains `result` (project path, 
 ## Notes
 
 - Scanning needs network access to the vulnerability sources (OSV, CISA KEV, EPSS, Maven Central, GitHub for repository statistics). If a source is unreachable, its data is missing from the report and the scan continues.
-- Gradle projects use the bundled Gradle wrapper support; Gradle results are best-effort (see [Features](features.md)).
+- Gradle projects use the bundled Gradle wrapper support; Gradle results are best-effort (see [Features](features.md)). The vulnerability lookup currently covers Maven coordinates, so a Gradle project is reported as unchecked and needs `--buildaegis.cli.allow-unchecked=true` until that is extended.

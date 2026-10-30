@@ -120,6 +120,32 @@ class ScanReportTest {
     }
 
     @Test
+    void dependenciesWithoutLookupResultsAreCountedAsUnchecked() {
+        var unknown = dep("offline", RiskLevel.LOW, 20, null, null, null, null);
+        var result = ScanReport.evaluate("/proj", List.of(clean("ok"), unknown, unknown), HIGH);
+
+        assertEquals(2, result.uncheckedDependencies());
+        assertTrue(ScanReport.toText(result).contains("2 of 3 dependencies could not be checked"));
+        assertFalse(result.failed(), "unchecked dependencies are reported, they do not by themselves fail the findings check");
+    }
+
+    @Test
+    void reportDoesNotSayPassedWhenDependenciesCouldNotBeChecked() {
+        var unknown = dep("offline", RiskLevel.LOW, 20, null, null, null, null);
+        String text = ScanReport.toText(ScanReport.evaluate("/proj", List.of(unknown), HIGH));
+
+        assertTrue(text.contains("Result: INCOMPLETE (1 dependencies could not be checked)"));
+        assertFalse(text.contains("Result: PASSED"));
+    }
+
+    @Test
+    void fullyCheckedScanHasNoWarning() {
+        var result = ScanReport.evaluate("/proj", List.of(clean("a"), clean("b")), HIGH);
+        assertEquals(0, result.uncheckedDependencies());
+        assertFalse(ScanReport.toText(result).contains("WARNING"));
+    }
+
+    @Test
     void thresholdParsing() {
         assertEquals(HIGH, ScanReport.Level.parseThreshold("high"));
         assertEquals(CRITICAL, ScanReport.Level.parseThreshold(" Critical "));

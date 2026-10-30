@@ -42,13 +42,15 @@ public final class ScanReport {
     }
 
     /**
+     * @param uncheckedDependencies dependencies whose vulnerabilities could not be looked up (source unreachable or build
+     *                              tool not supported), so "no findings" says nothing about them
      * @param counts                number of dependencies per severity (all dependencies, including clean ones as LOW)
      * @param overallRiskScore      0-100, see {@link #overallRiskScore(List)}
      * @param failOn                the threshold, or null if none was set
      * @param failing               dependencies with known vulnerabilities at or above the threshold, most severe first
      * @param failed                true if {@code failing} is not empty
      */
-    public record Result(String projectPath, int totalDependencies, int vulnerableDependencies,
+    public record Result(String projectPath, int totalDependencies, int vulnerableDependencies, int uncheckedDependencies,
                          Map<Level, Integer> counts, int overallRiskScore, Level failOn,
                          List<Finding> failing, boolean failed) {
     }
@@ -62,8 +64,12 @@ public final class ScanReport {
         }
 
         int vulnerable = 0;
+        int unchecked = 0;
         List<Finding> failing = new ArrayList<>();
         for (DependencyRiskDto d : deps) {
+            if (d.enrichment() == null || d.enrichment().vulnerabilityCount() == null) {
+                unchecked++;
+            }
             Level severity = severityOf(d);
             counts.merge(severity, 1, Integer::sum);
 
@@ -86,7 +92,7 @@ public final class ScanReport {
         failing.sort(Comparator.comparing(Finding::severity).reversed()
                 .thenComparing(Finding::riskScore, Comparator.nullsLast(Comparator.reverseOrder())));
 
-        return new Result(projectPath, deps.size(), vulnerable, counts, overallRiskScore(deps), failOn, failing, !failing.isEmpty());
+        return new Result(projectPath, deps.size(), vulnerable, unchecked, counts, overallRiskScore(deps), failOn, failing, !failing.isEmpty());
     }
 
     /**
@@ -153,6 +159,11 @@ public final class ScanReport {
                 .append("  Low: ").append(r.counts().get(Level.LOW))
                 .append("  Overall risk score: ").append(r.overallRiskScore()).append('\n');
 
+        if (r.uncheckedDependencies() > 0) {
+            sb.append("WARNING: ").append(r.uncheckedDependencies()).append(" of ").append(r.totalDependencies())
+                    .append(" dependencies could not be checked for vulnerabilities (vulnerability source unreachable, or build tool not supported).\n");
+        }
+
         if (r.failOn() == null) {
             sb.append("Result: no fail-on threshold set (exit code 0 unless the scan itself fails)\n");
             return sb.toString();
@@ -173,7 +184,14 @@ public final class ScanReport {
             }
             sb.append('\n');
         }
-        sb.append("Result: ").append(r.failed() ? "FAILED" : "PASSED").append('\n');
+        if (r.failed()) {
+            sb.append("Result: FAILED\n");
+        } else if (r.uncheckedDependencies() > 0) {
+            // "no findings" is not a pass when some dependencies could not even be checked
+            sb.append("Result: INCOMPLETE (").append(r.uncheckedDependencies()).append(" dependencies could not be checked)\n");
+        } else {
+            sb.append("Result: PASSED\n");
+        }
         return sb.toString();
     }
 

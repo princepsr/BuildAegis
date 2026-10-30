@@ -30,10 +30,13 @@ import java.util.Map;
  *   <li>{@code --buildaegis.cli.fail-on}: {@code none|low|medium|high|critical} (default {@code high})</li>
  *   <li>{@code --buildaegis.cli.format}: {@code text} (default) or {@code json}</li>
  *   <li>{@code --buildaegis.cli.output}: write the report to this file instead of the console</li>
+ *   <li>{@code --buildaegis.cli.allow-unchecked}: {@code true} to pass even if some dependencies could not be checked
+ *   (default {@code false})</li>
  * </ul>
  *
  * <p>Exit codes: {@code 0} passed, {@code 1} findings at or above the threshold, {@code 2} the scan or the options
- * were invalid. AI is never used in CLI mode.
+ * were invalid, or some dependencies could not be checked for vulnerabilities (a gate must not pass on data it could
+ * not get). AI is never used in CLI mode.
  */
 @Component
 @ConditionalOnProperty(name = "buildaegis.cli.project")
@@ -57,6 +60,9 @@ public class CliScanRunner implements CommandLineRunner, ExitCodeGenerator {
 
     @Value("${buildaegis.cli.output:}")
     private String output;
+
+    @Value("${buildaegis.cli.allow-unchecked:false}")
+    private boolean allowUnchecked;
 
     private int exitCode = EXIT_OK;
 
@@ -88,7 +94,19 @@ public class CliScanRunner implements CommandLineRunner, ExitCodeGenerator {
             }
             write(report);
 
-            exitCode = result.failed() ? EXIT_FINDINGS : EXIT_OK;
+            if (result.failed()) {
+                exitCode = EXIT_FINDINGS;
+            } else if (threshold != null && result.uncheckedDependencies() > 0 && !allowUnchecked) {
+                System.err.println("BuildAegis scan incomplete: " + result.uncheckedDependencies()
+                        + " dependencies could not be checked. Fix the cause (network access to OSV, supported build tool) "
+                        + "or pass --buildaegis.cli.allow-unchecked=true to accept this.");
+                exitCode = EXIT_ERROR;
+            } else {
+                if (threshold != null && result.uncheckedDependencies() > 0) {
+                    System.out.println("Accepted because --buildaegis.cli.allow-unchecked=true.");
+                }
+                exitCode = EXIT_OK;
+            }
         } catch (Exception e) {
             System.err.println("BuildAegis scan failed: " + (e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage()));
             exitCode = EXIT_ERROR;

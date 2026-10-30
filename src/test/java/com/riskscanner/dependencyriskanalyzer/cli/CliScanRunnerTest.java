@@ -43,7 +43,7 @@ class CliScanRunnerTest {
     private PrintStream originalOut;
     private PrintStream originalErr;
 
-    private static DependencyRiskDto dep(String artifact, RiskLevel level, int score, int vulns, String severity) {
+    private static DependencyRiskDto dep(String artifact, RiskLevel level, int score, Integer vulns, String severity) {
         var e = new DependencyEnrichmentDto("Maven", "g:" + artifact, "1.0", vulns, List.of(), null, null, null, null, null,
                 null, severity, null, null, null);
         return new DependencyRiskDto("g", artifact, "1.0", "maven", e, level, score, "x", List.of(), false, null, "disabled", "disabled", true);
@@ -127,6 +127,46 @@ class CliScanRunnerTest {
         runner.run();
         restoreStreams();
         assertEquals(CliScanRunner.EXIT_ERROR, runner.getExitCode());
+    }
+
+    @Test
+    void aScanThatCouldNotCheckDependenciesIsIncompleteNotAPass() throws Exception {
+        respondWith(dep("clean", RiskLevel.LOW, 20, 0, null), dep("offline", RiskLevel.LOW, 20, null, null));
+        runner.run();
+        restoreStreams();
+
+        assertEquals(CliScanRunner.EXIT_ERROR, runner.getExitCode());
+        assertTrue(err.toString().contains("could not be checked"));
+        assertTrue(out.toString().contains("WARNING"));
+    }
+
+    @Test
+    void uncheckedDependenciesCanBeAcceptedExplicitly() throws Exception {
+        ReflectionTestUtils.setField(runner, "allowUnchecked", true);
+        respondWith(dep("offline", RiskLevel.LOW, 20, null, null));
+        runner.run();
+        restoreStreams();
+
+        assertEquals(CliScanRunner.EXIT_OK, runner.getExitCode());
+    }
+
+    @Test
+    void findingsStillWinOverTheIncompleteScanCode() throws Exception {
+        respondWith(dep("tomcat", RiskLevel.HIGH, 80, 11, "CRITICAL"), dep("offline", RiskLevel.LOW, 20, null, null));
+        runner.run();
+        restoreStreams();
+
+        assertEquals(CliScanRunner.EXIT_FINDINGS, runner.getExitCode());
+    }
+
+    @Test
+    void failOnNoneDoesNotGateOnUncheckedDependencies() throws Exception {
+        ReflectionTestUtils.setField(runner, "failOn", "none");
+        respondWith(dep("offline", RiskLevel.LOW, 20, null, null));
+        runner.run();
+        restoreStreams();
+
+        assertEquals(CliScanRunner.EXIT_OK, runner.getExitCode());
     }
 
     @Test
