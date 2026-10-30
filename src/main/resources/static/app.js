@@ -1187,7 +1187,8 @@ const BuildAegis = (() => {
         
         const response = await fetch(`${API.BASE_URL}${API.ENDPOINTS.EXPORT_PDF}`, {
           method: 'POST',
-          headers: API.HEADERS,
+          // The PDF endpoint only produces application/pdf; Accept: application/json would get a 406
+          headers: { ...API.HEADERS, Accept: 'application/pdf' },
           body: JSON.stringify({ projectPath, forceRefresh: false, aiEnabled: State.settings.aiEnabled })
         });
 
