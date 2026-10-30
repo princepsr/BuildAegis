@@ -5,6 +5,7 @@ import com.riskscanner.dependencyriskanalyzer.model.DependencyCoordinate;
 import com.riskscanner.dependencyriskanalyzer.service.AiSettingsService;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.context.annotation.Primary;
+import com.riskscanner.dependencyriskanalyzer.service.UpgradeAdvisor;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
@@ -71,15 +72,47 @@ public class DefaultAIExplanationService implements AIExplanationService {
             }
 
             // Override with deterministic values to ensure AI doesn't change risk assessment
+            List<String> recommendations = new ArrayList<>(result.recommendations() == null ? List.of() : result.recommendations());
+            addUpgradeGuidance(client, dependency, enrichment, recommendations);
+
             return new ExplanationResult(
                     result.explanation(),
-                    result.recommendations(),
+                    recommendations,
                     true
             );
         } catch (Exception e) {
             // Fall back gracefully if AI fails, and tell the user why the explanation is not AI-generated
             var fallback = fallbackService.explainRisk(dependency, enrichment, deterministicRiskLevel, deterministicRiskScore);
             return new ExplanationResult(describeFailure(e) + "\n\n" + fallback.explanation(), fallback.recommendations(), false);
+        }
+    }
+
+    /**
+     * Adds the suggested fix version with its expected behaviour-change level and, best-effort, an AI summary
+     * of probable regressions when moving to that version. A failure here never fails the analysis.
+     */
+    private void addUpgradeGuidance(
+            AiClient client,
+            DependencyCoordinate dependency,
+            DependencyEnrichmentDto enrichment,
+            List<String> recommendations
+    ) {
+        if (enrichment == null || enrichment.suggestedFixVersion() == null) {
+            return;
+        }
+        String target = enrichment.suggestedFixVersion();
+        recommendations.add(UpgradeAdvisor.describeUpgrade(dependency.version(), target));
+        try {
+            String notes = client.generateCompletion(
+                    "In at most 3 short sentences, list the probable regressions or behaviour changes a project could hit when upgrading "
+                            + dependency.groupId() + ":" + dependency.artifactId() + " from " + dependency.version() + " to " + target
+                            + ". Mention only changes you are reasonably sure of; if unsure, say the release notes should be checked. "
+                            + "Reply with plain text only.");
+            if (notes != null && !notes.isBlank()) {
+                recommendations.add("Possible behaviour changes when upgrading to " + target + " (AI-generated, verify against release notes): " + notes.trim());
+            }
+        } catch (Exception ignored) {
+            // Optional extra; the deterministic upgrade advice above is still returned
         }
     }
 

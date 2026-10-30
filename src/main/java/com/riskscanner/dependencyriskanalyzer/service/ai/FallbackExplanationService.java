@@ -2,6 +2,7 @@ package com.riskscanner.dependencyriskanalyzer.service.ai;
 
 import com.riskscanner.dependencyriskanalyzer.dto.DependencyEnrichmentDto;
 import com.riskscanner.dependencyriskanalyzer.model.DependencyCoordinate;
+import com.riskscanner.dependencyriskanalyzer.service.UpgradeAdvisor;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
@@ -66,6 +67,10 @@ public class FallbackExplanationService implements AIExplanationService {
                         .append(enrichment.githubLastPushedAt())
                         .append(".");
             }
+        }
+
+        if (enrichment != null && enrichment.suggestedFixVersion() != null) {
+            recommendations.add(UpgradeAdvisor.describeUpgrade(dependency.version(), enrichment.suggestedFixVersion()));
         }
 
         // Add risk-level specific recommendations

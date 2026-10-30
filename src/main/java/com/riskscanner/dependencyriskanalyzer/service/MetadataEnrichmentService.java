@@ -63,6 +63,7 @@ public class MetadataEnrichmentService {
                     null,
                     null,
                     null,
+                    null,
                     null
             );
         }
@@ -88,7 +89,8 @@ public class MetadataEnrichmentService {
                 scm.githubRepo,
                 gh == null ? null : gh.stars,
                 gh == null ? null : gh.openIssues,
-                gh == null ? null : gh.lastPushedAt
+                gh == null ? null : gh.lastPushedAt,
+                osv.suggestedFixVersion
         );
     }
 
@@ -104,14 +106,20 @@ public class MetadataEnrichmentService {
 
             HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
             if (response.statusCode() / 100 != 2) {
-                return new OsvResult(null, List.of());
+                return new OsvResult(null, List.of(), null);
             }
 
             JsonNode root = objectMapper.readTree(response.body());
             JsonNode vulns = root.path("vulns");
             if (!vulns.isArray()) {
-                return new OsvResult(0, List.of());
+                return new OsvResult(0, List.of(), null);
             }
+
+            List<List<String>> fixedPerVuln = new ArrayList<>();
+            for (JsonNode v : vulns) {
+                fixedPerVuln.add(extractFixedVersions(v, packageName));
+            }
+            String suggested = UpgradeAdvisor.suggestFixVersion(version, fixedPerVuln);
 
             List<String> ids = new ArrayList<>();
             for (JsonNode v : vulns) {
@@ -123,9 +131,9 @@ public class MetadataEnrichmentService {
                     break;
                 }
             }
-            return new OsvResult(vulns.size(), ids);
+            return new OsvResult(vulns.size(), ids, suggested);
         } catch (Exception e) {
-            return new OsvResult(null, List.of());
+            return new OsvResult(null, List.of(), null);
         }
     }
 
@@ -230,7 +238,25 @@ public class MetadataEnrichmentService {
         return s.replace("\\", "\\\\").replace("\"", "\\\"");
     }
 
-    private record OsvResult(Integer vulnerabilityCount, List<String> vulnerabilityIds) {}
+    private List<String> extractFixedVersions(JsonNode vuln, String packageName) {
+        List<String> fixed = new ArrayList<>();
+        for (JsonNode affected : vuln.path("affected")) {
+            if (!packageName.equals(affected.path("package").path("name").asText())) {
+                continue;
+            }
+            for (JsonNode range : affected.path("ranges")) {
+                for (JsonNode event : range.path("events")) {
+                    String f = event.path("fixed").asText(null);
+                    if (f != null) {
+                        fixed.add(f);
+                    }
+                }
+            }
+        }
+        return fixed;
+    }
+
+    private record OsvResult(Integer vulnerabilityCount, List<String> vulnerabilityIds, String suggestedFixVersion) {}
 
     private record ScmResult(String scmUrl, String githubRepo) {}
 
