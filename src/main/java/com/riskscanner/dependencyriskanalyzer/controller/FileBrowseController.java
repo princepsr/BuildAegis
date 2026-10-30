@@ -7,6 +7,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import javax.swing.JFileChooser;
+import javax.swing.JFrame;
+import javax.swing.UIManager;
 import javax.swing.SwingUtilities;
 import java.awt.GraphicsEnvironment;
 import java.io.File;
@@ -36,11 +38,29 @@ public class FileBrowseController {
 
         AtomicReference<File> selected = new AtomicReference<>();
         SwingUtilities.invokeAndWait(() -> {
-            JFileChooser chooser = new JFileChooser();
-            chooser.setDialogTitle("Select project folder or build file");
-            chooser.setFileSelectionMode(JFileChooser.FILES_AND_DIRECTORIES);
-            if (chooser.showOpenDialog(null) == JFileChooser.APPROVE_OPTION) {
-                selected.set(chooser.getSelectedFile());
+            try {
+                UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName());
+            } catch (Exception ignored) {
+                // keep the default look and feel
+            }
+            // A dialog without a visible owner opens behind the browser/app window on some systems;
+            // a tiny always-on-top owner brings it to the front.
+            JFrame owner = new JFrame();
+            owner.setUndecorated(true);
+            owner.setSize(1, 1);
+            owner.setLocationRelativeTo(null);
+            owner.setAlwaysOnTop(true);
+            owner.setVisible(true);
+            owner.toFront();
+            try {
+                JFileChooser chooser = new JFileChooser();
+                chooser.setDialogTitle("Select project folder or build file");
+                chooser.setFileSelectionMode(JFileChooser.FILES_AND_DIRECTORIES);
+                if (chooser.showOpenDialog(owner) == JFileChooser.APPROVE_OPTION) {
+                    selected.set(chooser.getSelectedFile());
+                }
+            } finally {
+                owner.dispose();
             }
         });
 
