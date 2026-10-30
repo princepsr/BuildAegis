@@ -265,9 +265,10 @@
                     <div class="kpi__k">Low</div>
                     <div class="kpi__v mono" id="kpiLow">--</div>
                   </div>
-                  <div class="kpi kpi--neutral" aria-label="Overall risk score" data-tooltip="Risk score (0-100): Higher means more critical vulnerabilities found. Based on severity counts.">
+                  <div class="kpi kpi--neutral" aria-label="Overall risk score" data-tooltip="Risk score (0-100) for all analyzed dependencies: the highest dependency risk score, plus a small increase for each additional vulnerable dependency. Filters do not change it; the filtered view's score is shown below it.">
                     <div class="kpi__k">Overall risk score</div>
                     <div class="kpi__v mono" id="kpiOverallRisk">--</div>
+                    <div class="kpi__k" id="kpiOverallNote" hidden></div>
                   </div>
                 </div>
 
