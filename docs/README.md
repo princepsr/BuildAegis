@@ -57,7 +57,7 @@ docs/
 The overall risk score is built from the **per-dependency risk scores** calculated by the backend:
 
 - **Overall score** = highest dependency score in the project + 1 point per additional vulnerable dependency (max +5), capped at 100
-- **Per-dependency score** (0-100): base 20, plus points by the real severity of each vulnerability (Critical +55, High +40, Medium +20, Low +8; max +75), +25 and a floor of 90 for vulnerabilities exploited in the wild (CISA KEV), and small maintenance/adoption factors; 70+ = High, 40-69 = Medium, 20-39 = Low
+- **Per-dependency score** (0-100): base 20, plus points for the most severe vulnerability (Critical +55, High +40, Medium +20, Low +8) plus +3 for each additional one (max +15 extra, max +65 in total), +25 and a floor of 90 for vulnerabilities exploited in the wild (CISA KEV), and small maintenance/adoption factors; 70+ = High, 40-69 = Medium, 20-39 = Low
 - **Whole project, not the current view**: filters and search do **not** change the overall score or status chip. While filtering, a "Filtered view: N" line shows the score of the visible findings
 - **Scale**: 0-100, where higher = more risk
 

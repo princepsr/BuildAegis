@@ -43,7 +43,7 @@ BuildAegis provides comprehensive vulnerability analysis for Java projects. This
 Each dependency gets a deterministic risk score from the backend (AI is only used to write the explanation):
 
 - Starts at 20
-- Known vulnerabilities add points by their **real severity** (Critical +55, High +40, Medium +20, Low +8 each, capped at +75)
+- Known vulnerabilities add points by their **real severity**: the most severe one counts in full (Critical +55, High +40, Medium +20, Low +8), each additional one adds +3 (max +15), capped at +65 in total
 - A vulnerability **exploited in the wild** (CISA KEV) adds 25 and keeps the score at 90 or above
 - A high exploit probability (EPSS) adds a few points
 - Small additions for long inactivity, a large open-issue backlog and low community adoption
