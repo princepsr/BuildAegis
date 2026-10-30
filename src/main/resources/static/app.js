@@ -837,8 +837,8 @@ const BuildAegis = (() => {
       }
     },
     
-    // `summary`/`findings` describe the filtered view (the count tiles); `overall` is the whole analysis, which
-    // drives the overall risk score and status chip so that filtering never changes them.
+    // `summary`/`findings` describe the filtered view and drive the tiles, risk score and status chip;
+    // `overall` is the whole analysis and only feeds the "All dependencies" reference note under the score.
     updateSummary(summary, findings = [], overall = State.allFindings) {
       const { critical = 0, high = 0, medium = 0, low = 0 } = summary;
 
@@ -853,27 +853,29 @@ const BuildAegis = (() => {
       const vulnerable = findings.filter(f => (f.vulnerabilityCount || 0) > 0).length;
       DOM.setText(DOM.get('kpiVulnsFound'), vulnerable);
       
-      // Overall risk score and status describe the whole analysis, not the filtered view
-      const all = this.computeSummary(overall);
-      const allTotal = all.critical + all.high + all.medium + all.low;
-      // Clean (zero-vulnerability) dependencies are not risk and must not add to the score
-      const lowWithVulns = overall.filter(f =>
-        String(f.severity).toUpperCase() === 'LOW' && (f.vulnerabilityCount || 0) > 0).length;
-      const riskScore = this.calculateRealisticRiskScore(all.critical, all.high, all.medium, lowWithVulns);
-      DOM.setText(DOM.get('kpiOverallRisk'), riskScore);
-      
+      // Risk score and status describe the current (filtered) view
+      DOM.setText(DOM.get('kpiOverallRisk'), this.riskScoreFor(findings));
+
+      // While a filter is active, show the whole-project score for reference
+      const noteEl = DOM.get('kpiOverallNote');
+      if (noteEl) {
+        const filtered = findings.length !== overall.length;
+        noteEl.hidden = !filtered || overall.length === 0;
+        noteEl.textContent = `All dependencies: ${this.riskScoreFor(overall)}`;
+      }
+
       const statusEl = DOM.get('appStatus');
       
-      if (allTotal === 0) {
+      if (total === 0) {
         statusEl.className = 'status-chip status-chip--success';
         statusEl.textContent = 'No Issues';
-      } else if (all.critical > 0) {
+      } else if (critical > 0) {
         statusEl.className = 'status-chip status-chip--critical';
         statusEl.textContent = 'Critical Issues';
-      } else if (all.high > 0) {
+      } else if (high > 0) {
         statusEl.className = 'status-chip status-chip--high';
         statusEl.textContent = 'High Risk';
-      } else if (all.medium > 0) {
+      } else if (medium > 0) {
         statusEl.className = 'status-chip status-chip--medium';
         statusEl.textContent = 'Medium Risk';
       } else {
@@ -882,6 +884,14 @@ const BuildAegis = (() => {
       }
     },
     
+    // Risk score for a list of findings. Clean (zero-vulnerability) dependencies are not risk and don't add to it.
+    riskScoreFor(list) {
+      const s = this.computeSummary(list);
+      const lowWithVulns = list.filter(f =>
+        String(f.severity).toUpperCase() === 'LOW' && (f.vulnerabilityCount || 0) > 0).length;
+      return this.calculateRealisticRiskScore(s.critical, s.high, s.medium, lowWithVulns);
+    },
+
     calculateRealisticRiskScore(critical, high, medium, low) {
       // Weighted impact values (Critical disproportionately higher)
       const weights = { critical: 40, high: 15, medium: 5, low: 1 };
@@ -920,6 +930,16 @@ const BuildAegis = (() => {
       }
       if (critical === 0 && high === 0 && finalScore > 30) {
         finalScore = 30; // Only medium/low cannot exceed 30
+      }
+      // Severity floors keep small views meaningful (e.g. a High-only filter must not score near zero)
+      if (high > 0 && finalScore < 25) {
+        finalScore = 25;
+      }
+      if (medium > 0 && finalScore < 10) {
+        finalScore = 10;
+      }
+      if (low > 0 && finalScore < 3) {
+        finalScore = 3;
       }
       
       return Math.round(finalScore);
