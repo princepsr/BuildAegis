@@ -27,7 +27,13 @@ public class BuildAegisApplication {
 	}
 
 	public static boolean isCliMode(String[] args) {
-		return args != null && Arrays.stream(args).anyMatch(a -> a.startsWith("--buildaegis.cli.project="));
+		// Same sources Spring uses for the property CliScanRunner is activated by: argument, system property, environment
+		boolean fromArgs = args != null && Arrays.stream(args).anyMatch(a -> a.startsWith("--buildaegis.cli.project="));
+		return fromArgs || isSet(System.getProperty("buildaegis.cli.project")) || isSet(System.getenv("BUILDAEGIS_CLI_PROJECT"));
+	}
+
+	private static boolean isSet(String value) {
+		return value != null && !value.isBlank();
 	}
 
 }
