@@ -8,7 +8,9 @@ import com.riskscanner.dependencyriskanalyzer.dto.ProjectAnalysisRequest;
 import com.riskscanner.dependencyriskanalyzer.dto.ProjectAnalysisResponse;
 import com.riskscanner.dependencyriskanalyzer.model.DependencyCoordinate;
 import com.riskscanner.dependencyriskanalyzer.model.DependencyRiskCacheEntity;
+import com.riskscanner.dependencyriskanalyzer.model.ProjectDependencyEntity;
 import com.riskscanner.dependencyriskanalyzer.repository.DependencyRiskCacheRepository;
+import com.riskscanner.dependencyriskanalyzer.repository.ProjectDependencyRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -49,6 +51,7 @@ public class ProjectAnalysisService {
     private final ObjectMapper objectMapper;
     private final DeterministicRiskCalculator riskCalculator;
     private final FallbackExplanationService fallbackExplanationService;
+    private final ProjectDependencyRepository projectDependencyRepository;
 
     public ProjectAnalysisService(
             DependencyScannerService dependencyScannerService,
@@ -58,8 +61,10 @@ public class ProjectAnalysisService {
             MetadataEnrichmentService metadataEnrichmentService,
             ObjectMapper objectMapper,
             DeterministicRiskCalculator riskCalculator,
-            FallbackExplanationService fallbackExplanationService
+            FallbackExplanationService fallbackExplanationService,
+            ProjectDependencyRepository projectDependencyRepository
     ) {
+        this.projectDependencyRepository = projectDependencyRepository;
         this.dependencyScannerService = dependencyScannerService;
         this.aiAnalysisService = aiAnalysisService;
         this.aiSettingsService = aiSettingsService;
@@ -94,6 +99,14 @@ public class ProjectAnalysisService {
             String key = d.groupId() + ":" + d.artifactId() + ":" + d.version() + ":" + d.buildTool();
             deduped.putIfAbsent(key, d);
         }
+
+        // Remember which dependencies (and which of them are direct) belong to this project, so the UI can
+        // later show cached results per project and label direct vs transitive correctly.
+        String projectKey = ProjectPathKey.of(request.projectPath());
+        projectDependencyRepository.deleteByProjectPath(projectKey);
+        projectDependencyRepository.saveAll(deduped.values().stream()
+                .map(d -> new ProjectDependencyEntity(projectKey, d.groupId(), d.artifactId(), d.version(), d.isDirect()))
+                .toList());
 
         List<DependencyRiskDto> results = new ArrayList<>();
         Instant analyzedAt = Instant.now();
