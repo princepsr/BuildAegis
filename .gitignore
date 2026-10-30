@@ -33,3 +33,8 @@ build/
 .vscode/
 data/risk-scanner.mv.db
 data/risk-scanner.trace.db
+
+### BuildAegis local files ###
+data/
+logs/
+test_openrouter.py
