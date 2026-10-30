@@ -62,6 +62,11 @@ public class DesktopApplication extends Application {
     }
 
     public static void main(String[] args) {
+        // Direct3D texture errors (issue #20) occur on some GPUs/drivers; default to the software
+        // pipeline unless the user chose a pipeline explicitly (e.g. -Dprism.order=d3d).
+        if (System.getProperty("prism.order") == null) {
+            System.setProperty("prism.order", "sw");
+        }
         launch(args);
     }
 }
