@@ -1122,3 +1122,5 @@ html.lite *, html.lite *::before, html.lite *::after{
 .fs-item{display:block; width:100%; text-align:left; padding:8px 10px; background:none; border:0; border-bottom:1px solid rgba(127,127,127,.2); color:var(--text); font:inherit; cursor:pointer;}
 .fs-item:hover,.fs-item:focus{background:rgba(127,127,127,.15); outline:none;}
 .fs-item--file{color:var(--muted);}
+
+.pill--danger{background:rgba(220,38,38,.18); color:#ef4444; border-color:rgba(220,38,38,.45); font-weight:600;}

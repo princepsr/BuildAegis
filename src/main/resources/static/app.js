@@ -1013,6 +1013,17 @@ const BuildAegis = (() => {
       DOM.setText(DOM.get('detailsConfidence'), `Confidence: ${String(finding.confidence || '--').toUpperCase()}`);
       DOM.setText(DOM.get('detailsDirectness'), finding.directness || '--');
       DOM.setText(DOM.get('detailsSource'), `Source: ${finding.source || '--'}`);
+
+      // Exploit information: only shown when available
+      const exploitEl = DOM.get('detailsExploit');
+      if (exploitEl) {
+        const parts = [];
+        if (finding.knownExploited) parts.push('Exploited in the wild (CISA KEV)');
+        if (typeof finding.epssScore === 'number') parts.push(`EPSS: ${Math.round(finding.epssScore * 100)}%`);
+        exploitEl.textContent = parts.join(' | ');
+        exploitEl.hidden = parts.length === 0;
+        exploitEl.classList.toggle('pill--danger', !!finding.knownExploited);
+      }
       DOM.setText(DOM.get('detailsDescription'), finding.description || '--');
       DOM.setText(DOM.get('detailsAffected'), finding.affectedVersions || '--');
       DOM.setText(DOM.get('detailsPath'), finding.dependencyPath || '--');
@@ -1175,12 +1186,16 @@ const BuildAegis = (() => {
 
         const vulnerabilityCount = r.enrichment?.vulnerabilityCount || 0;
 
-        // Severity follows the backend risk level so the table, KPIs and overall score agree with each other.
-        // 10+ known vulnerabilities escalates to CRITICAL. Without a usable backend level, fall back to the count:
-        // High: 5+, Medium: 2+, Low: otherwise
+        // Severity: CRITICAL if a vulnerability is exploited in the wild (CISA KEV); otherwise the highest real severity
+        // reported by the advisories (CVSS / GitHub severity). Without severity data, 10+ vulnerabilities is CRITICAL and
+        // the backend risk level is used; as a last resort the count (High: 5+, Medium: 2+, Low: otherwise).
         const backendLevel = String(r.riskLevel || '').toUpperCase();
+        const advisorySeverity = String(r.enrichment?.maxSeverity || '').toUpperCase();
+        const knownExploited = r.enrichment?.knownExploited === true;
         let severity;
-        if (vulnerabilityCount >= 10) severity = 'CRITICAL';
+        if (knownExploited) severity = 'CRITICAL'; // actively exploited in the wild (CISA KEV)
+        else if (vulnerabilityCount > 0 && ['CRITICAL', 'HIGH', 'MEDIUM', 'LOW'].includes(advisorySeverity)) severity = advisorySeverity;
+        else if (vulnerabilityCount >= 10) severity = 'CRITICAL';
         else if (['HIGH', 'MEDIUM', 'LOW'].includes(backendLevel)) severity = backendLevel;
         else if (vulnerabilityCount >= 5) severity = 'HIGH';
         else if (vulnerabilityCount >= 2) severity = 'MEDIUM';
@@ -1221,6 +1236,9 @@ const BuildAegis = (() => {
           fromCache: r.fromCache,
           analyzedAt: r.analyzedAt,
           vulnerabilityCount: vulnerabilityCount,
+          knownExploited: knownExploited,
+          epssScore: r.enrichment?.maxEpssScore ?? null,
+          suggestedFixVersion: r.enrichment?.suggestedFixVersion || null,
           riskScore: r.riskScore || 0,
           buildTool: r.buildTool
         };

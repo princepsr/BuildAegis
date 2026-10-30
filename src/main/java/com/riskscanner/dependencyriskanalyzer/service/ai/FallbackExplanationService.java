@@ -41,6 +41,17 @@ public class FallbackExplanationService implements AIExplanationService {
             explanation.append(" It has ")
                     .append(enrichment.vulnerabilityCount())
                     .append(" known vulnerabilities.");
+            if (enrichment.maxSeverity() != null) {
+                explanation.append(" The most severe one is rated ").append(enrichment.maxSeverity()).append(".");
+            }
+            if (Boolean.TRUE.equals(enrichment.knownExploited())) {
+                explanation.append(" At least one of them is being exploited in the wild (CISA Known Exploited Vulnerabilities).");
+                recommendations.add("Prioritize this dependency: a vulnerability is actively exploited in the wild.");
+            }
+            if (enrichment.maxEpssScore() != null && enrichment.maxEpssScore() >= 0.1) {
+                explanation.append(" Its exploit probability (EPSS) is ")
+                        .append(Math.round(enrichment.maxEpssScore() * 100)).append("%.");
+            }
             recommendations.add("Review and address known vulnerabilities.");
             if (enrichment.vulnerabilityIds() != null && !enrichment.vulnerabilityIds().isEmpty()) {
                 explanation.append(" Affected CVEs: ").append(String.join(", ", enrichment.vulnerabilityIds())).append(".");
