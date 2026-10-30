@@ -33,6 +33,27 @@ public class AiSettingsService {
         this.cryptoService = cryptoService;
     }
 
+    /** Prefix of the placeholder shown instead of the stored API key. */
+    static final String MASK = "********";
+
+    /** Returns the API key as a placeholder that reveals at most its last four characters. */
+    static String maskApiKey(String apiKey) {
+        if (apiKey == null || apiKey.isBlank()) {
+            return null;
+        }
+        return apiKey.length() > 12 ? MASK + apiKey.substring(apiKey.length() - 4) : MASK;
+    }
+
+    /**
+     * Same as {@link #getSettings()} but with the API key masked. Use this for anything that leaves the backend
+     * (REST responses); the real key is only needed server-side via {@link #getApiKeyOrThrow()}.
+     */
+    @Transactional(readOnly = true)
+    public AiSettingsResponse getSettingsMasked() {
+        AiSettingsResponse s = getSettings();
+        return new AiSettingsResponse(s.provider(), s.model(), s.customEndpoint(), maskApiKey(s.apiKey()), s.configured(), s.updatedAt());
+    }
+
     @Transactional(readOnly = true)
     public AiSettingsResponse getSettings() {
         return aiSettingsRepository.findById(SETTINGS_ID)
@@ -66,27 +87,37 @@ public class AiSettingsService {
         if (request.model() == null || request.model().isBlank()) {
             throw new IllegalArgumentException("model is required");
         }
-        if (request.apiKey() == null || request.apiKey().isBlank()) {
-            throw new IllegalArgumentException("apiKey is required");
-        }
         if ("custom".equals(request.provider()) && (request.customEndpoint() == null || request.customEndpoint().isBlank())) {
             throw new IllegalArgumentException("customEndpoint is required for custom provider");
         }
 
-        AiSettingsEntity entity = aiSettingsRepository.findById(SETTINGS_ID).orElseGet(AiSettingsEntity::new);
+        AiSettingsEntity existing = aiSettingsRepository.findById(SETTINGS_ID).orElse(null);
+        String incomingKey = request.apiKey() == null ? "" : request.apiKey().trim();
+        // The UI shows the key masked; sending the mask (or nothing) back means "keep the stored key"
+        boolean keepStoredKey = existing != null && (incomingKey.isEmpty() || incomingKey.startsWith(MASK));
+        if (incomingKey.isEmpty() && !keepStoredKey) {
+            throw new IllegalArgumentException("apiKey is required");
+        }
+
+        AiSettingsEntity entity = existing != null ? existing : new AiSettingsEntity();
         entity.setId(SETTINGS_ID);
         entity.setProvider(request.provider().trim());
         entity.setModel(request.model().trim());
         entity.setCustomEndpoint("custom".equals(request.provider()) ? request.customEndpoint().trim() : null);
 
+        String plainKey = keepStoredKey
+                ? cryptoService.decrypt(existing.getApiKeyCiphertext(), existing.isEncrypted())
+                : incomingKey;
+
+        // Always re-store with the current encryption setting, so keys saved in plain text by older versions get encrypted
         boolean encrypt = cryptoService.isEncryptionConfigured();
         entity.setEncrypted(encrypt);
-        entity.setApiKeyCiphertext(encrypt ? cryptoService.encrypt(request.apiKey().trim()) : request.apiKey().trim());
+        entity.setApiKeyCiphertext(encrypt ? cryptoService.encrypt(plainKey) : plainKey);
         entity.setUpdatedAt(Instant.now());
 
         aiSettingsRepository.save(entity);
 
-        return new AiSettingsResponse(entity.getProvider(), entity.getModel(), entity.getCustomEndpoint(), request.apiKey(), true, entity.getUpdatedAt());
+        return new AiSettingsResponse(entity.getProvider(), entity.getModel(), entity.getCustomEndpoint(), maskApiKey(plainKey), true, entity.getUpdatedAt());
     }
 
     @Transactional(readOnly = true)

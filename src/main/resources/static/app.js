@@ -62,7 +62,14 @@ const BuildAegis = (() => {
         const response = await fetch(url, config);
         
         if (!response.ok) {
-          const error = new Error(this.getFriendlyErrorMessage(response.status));
+          // The backend returns {"error": "..."} with a short, safe message; prefer it over the generic text
+          let serverMessage = null;
+          try {
+            serverMessage = (await response.clone().json())?.error || null;
+          } catch (ignored) {
+            // no JSON body
+          }
+          const error = new Error(serverMessage || this.getFriendlyErrorMessage(response.status));
           error.status = response.status;
           error.response = response;
           throw error;

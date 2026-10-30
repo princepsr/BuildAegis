@@ -30,7 +30,7 @@ public class AiSettingsController {
      */
     @GetMapping("/settings")
     public AiSettingsResponse getSettings() {
-        return aiSettingsService.getSettings();
+        return aiSettingsService.getSettingsMasked();
     }
 
     /**
