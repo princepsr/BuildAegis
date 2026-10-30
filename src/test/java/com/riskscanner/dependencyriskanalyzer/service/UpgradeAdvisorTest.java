@@ -25,6 +25,34 @@ class UpgradeAdvisorTest {
     }
 
     @Test
+    void prefersAFixOnTheSameMajorLine() {
+        // spring-webmvc 6.2.2: most advisories are fixed in 6.2.x, two only in 7.0.9
+        List<List<String>> fixes = List.of(
+                List.of("7.0.8", "6.2.19"),
+                List.of("7.0.6", "6.2.17"),
+                List.of("7.0.9"),
+                List.of("7.0.9"));
+
+        assertEquals("6.2.19", UpgradeAdvisor.suggestFixVersion("6.2.2", fixes));
+        String note = UpgradeAdvisor.fixNote("6.2.19", fixes);
+        assertTrue(note.startsWith("2 of 4 vulnerabilities"));
+        assertTrue(note.contains("7.0.9"));
+    }
+
+    @Test
+    void fallsBackToAnotherMajorWhenNothingIsFixedOnTheCurrentLine() {
+        List<List<String>> fixes = List.of(List.of("7.0.9"));
+        assertEquals("7.0.9", UpgradeAdvisor.suggestFixVersion("6.2.2", fixes));
+        assertNull(UpgradeAdvisor.fixNote("7.0.9", fixes));
+    }
+
+    @Test
+    void noNoteWhenTheSuggestionCoversEverything() {
+        List<List<String>> fixes = List.of(List.of("2.9.5", "2.10.1"), List.of("2.9.8"));
+        assertNull(UpgradeAdvisor.fixNote(UpgradeAdvisor.suggestFixVersion("2.9.0", fixes), fixes));
+    }
+
+    @Test
     void noSuggestionWhenNoFixKnown() {
         assertNull(UpgradeAdvisor.suggestFixVersion("1.0.0", List.of(List.of(), List.of("0.9.0"))));
     }

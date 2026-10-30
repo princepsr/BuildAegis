@@ -17,8 +17,8 @@ Calculated deterministically by `DeterministicRiskCalculator` (AI is never used 
 | Factor | Effect on score |
 |---|---|
 | Base | starts at **20** |
-| Known vulnerabilities, weighted by the **real severity** of each | **Critical +55, High +40, Medium +20, Low +8** per vulnerability; total capped at **+75** |
-| Vulnerabilities without severity information (when others have it) | count as Medium (**+20** each) |
+| Known vulnerabilities, by **real severity** | the **most severe** one counts in full: **Critical +55, High +40, Medium +20, Low +8**; **+3** for each additional vulnerability (at most +15); total capped at **+65** |
+| Vulnerabilities without severity information (when others have it) | count as Medium (+20) for choosing the most severe one |
 | No severity information at all | older rule: **+25 per vulnerability**, capped at **+60** |
 | **Exploited in the wild** (CISA KEV) | **+25**, and the score is never below **90** |
 | High exploit probability (EPSS 50% or more / 10% or more) | +10 / +5 |
@@ -35,7 +35,7 @@ The score is capped at 100 and mapped to a risk level:
 | 20-39 | LOW |
 | below 20 | UNKNOWN |
 
-Examples: one Critical vulnerability scores 75 (HIGH); one High 60; one Medium 40; one Low 28; a Low-severity vulnerability that is exploited in the wild scores 90. Several Low-severity vulnerabilities do not outrank a single Critical one.
+Examples: one Critical vulnerability scores 75 (HIGH); one High 60; two High 63; a library with many Critical ones at most 85; one Medium 40; one Low 28; a Low-severity vulnerability that is exploited in the wild scores 90. Several Low-severity vulnerabilities do not outrank a single Critical one, and only exploited-in-the-wild findings reach 90 and above, so the top of the scale is not used up by ordinary vulnerable libraries.
 
 ## Where Severity and Exploit Data Come From
 
@@ -111,3 +111,7 @@ The chip always reflects the whole project:
 - `src/main/resources/static/app.js` (`riskScoreFor`, `updateSummary`, `mapProjectResultsToFindings`)
 - `src/main/java/com/riskscanner/dependencyriskanalyzer/service/ai/DeterministicRiskCalculator.java`
 - `src/main/java/com/riskscanner/dependencyriskanalyzer/service/vulnerability/` (`OsvAdvisoryParser`, `Cvss3`, `ExploitDataService`)
+
+## Suggested Fix Version
+
+The suggested version is the smallest one that fixes the vulnerabilities **on the same major version** as the one you use (for example 6.2.2 suggests 6.2.19, not 7.0.9). If some vulnerabilities are only fixed in another major version, the details say so ("2 of 14 vulnerabilities are not fixed in this major version; fixing them needs a major upgrade to 7.0.9"). Only when nothing is fixed on your major version is a version on another major line suggested.

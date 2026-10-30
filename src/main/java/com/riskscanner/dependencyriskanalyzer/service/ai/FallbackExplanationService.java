@@ -82,6 +82,9 @@ public class FallbackExplanationService implements AIExplanationService {
 
         if (enrichment != null && enrichment.suggestedFixVersion() != null) {
             recommendations.add(UpgradeAdvisor.describeUpgrade(dependency.version(), enrichment.suggestedFixVersion()));
+            if (enrichment.fixNote() != null) {
+                recommendations.add(enrichment.fixNote());
+            }
         }
 
         // Add risk-level specific recommendations

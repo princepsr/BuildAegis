@@ -46,8 +46,10 @@ public final class UpgradeAdvisor {
     }
 
     /**
-     * Picks the smallest version that fixes all given vulnerabilities: for each vulnerability the lowest
-     * fixed version above {@code current}, then the highest of those.
+     * Picks the smallest version that fixes the given vulnerabilities, preferring a version on the same major line
+     * as {@code current}: for each vulnerability the lowest fixed version above {@code current}, then the highest of
+     * those. Only if no vulnerability has a fix on the current major line, the lowest fix on any line is used.
+     * Use {@link #fixNote} to learn which vulnerabilities the suggestion does not cover.
      *
      * @param fixedVersionsPerVulnerability for each vulnerability, the list of versions in which it was fixed
      * @return the suggested version, or {@code null} when none is known
@@ -56,10 +58,56 @@ public final class UpgradeAdvisor {
         if (current == null) {
             return null;
         }
-        String best = null;
+        String sameLine = pick(current, fixedVersionsPerVulnerability, true);
+        return sameLine != null ? sameLine : pick(current, fixedVersionsPerVulnerability, false);
+    }
+
+    /**
+     * Explains vulnerabilities that the suggested version does not fix because they are only fixed on another
+     * major line, or {@code null} when the suggestion covers everything that has a known fix.
+     */
+    public static String fixNote(String suggested, List<List<String>> fixedVersionsPerVulnerability) {
+        if (suggested == null) {
+            return null;
+        }
+        int remaining = 0;
+        String needed = null;
         for (List<String> fixes : fixedVersionsPerVulnerability) {
+            boolean covered = false;
+            for (String f : fixes) {
+                if (sameMajor(f, suggested) && compareVersions(f, suggested) <= 0) {
+                    covered = true;
+                    break;
+                }
+            }
+            if (covered || fixes.isEmpty()) {
+                continue;
+            }
+            remaining++;
+            String lowest = null;
+            for (String f : fixes) {
+                if (lowest == null || compareVersions(f, lowest) < 0) {
+                    lowest = f;
+                }
+            }
+            if (needed == null || compareVersions(lowest, needed) > 0) {
+                needed = lowest;
+            }
+        }
+        if (remaining == 0) {
+            return null;
+        }
+        return remaining + " of " + fixedVersionsPerVulnerability.size() + " vulnerabilities are not fixed in this major version; fixing them needs a major upgrade to " + needed + ".";
+    }
+
+    private static String pick(String current, List<List<String>> fixedPerVuln, boolean sameMajorOnly) {
+        String best = null;
+        for (List<String> fixes : fixedPerVuln) {
             String lowestAbove = null;
             for (String f : fixes) {
+                if (sameMajorOnly && !sameMajor(f, current)) {
+                    continue;
+                }
                 if (compareVersions(f, current) > 0 && (lowestAbove == null || compareVersions(f, lowestAbove) < 0)) {
                     lowestAbove = f;
                 }
@@ -69,6 +117,12 @@ public final class UpgradeAdvisor {
             }
         }
         return best;
+    }
+
+    private static boolean sameMajor(String a, String b) {
+        List<String> x = numericParts(a);
+        List<String> y = numericParts(b);
+        return !x.isEmpty() && !y.isEmpty() && x.get(0).equals(y.get(0));
     }
 
     /**

@@ -233,6 +233,9 @@ public class DefaultAIExplanationService implements AIExplanationService {
             if (enrichment.suggestedFixVersion() != null) {
                 p.append("Smallest version fixing all known vulnerabilities: ").append(enrichment.suggestedFixVersion()).append("\n");
             }
+            if (enrichment.fixNote() != null) {
+                p.append("Note: ").append(enrichment.fixNote()).append("\n");
+            }
         }
 
         if (releaseNotes != null) {

@@ -29,6 +29,16 @@ public record DependencyEnrichmentDto(
         String maxSeverity,
         Map<String, Integer> severityCounts,
         Boolean knownExploited,
-        Double maxEpssScore
+        Double maxEpssScore,
+        String fixNote
 ) {
+    public DependencyEnrichmentDto(String ecosystem, String packageName, String version, Integer vulnerabilityCount,
+                                   List<String> vulnerabilityIds, String scmUrl, String githubRepo, Integer githubStars,
+                                   Integer githubOpenIssues, Instant githubLastPushedAt, String suggestedFixVersion,
+                                   String maxSeverity, Map<String, Integer> severityCounts, Boolean knownExploited,
+                                   Double maxEpssScore) {
+        this(ecosystem, packageName, version, vulnerabilityCount, vulnerabilityIds, scmUrl, githubRepo, githubStars,
+                githubOpenIssues, githubLastPushedAt, suggestedFixVersion, maxSeverity, severityCounts, knownExploited,
+                maxEpssScore, null);
+    }
 }

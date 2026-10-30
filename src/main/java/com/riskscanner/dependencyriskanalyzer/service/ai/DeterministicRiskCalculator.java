@@ -134,13 +134,18 @@ public class DeterministicRiskCalculator {
     private static final int LOW_POINTS = 8;
     /** Vulnerabilities without severity information are treated like medium ones. */
     private static final int UNKNOWN_SEVERITY_POINTS = 20;
-    private static final int MAX_VULNERABILITY_POINTS = 75;
+    /** Added for each vulnerability beyond the first, at most {@link #MAX_EXTRA_POINTS} in total. */
+    private static final int EXTRA_VULNERABILITY_POINTS = 3;
+    private static final int MAX_EXTRA_POINTS = 15;
+    private static final int MAX_VULNERABILITY_POINTS = 65;
     /** A dependency with a vulnerability that is exploited in the wild is never scored below this. */
     private static final int KNOWN_EXPLOITED_FLOOR = 90;
 
     /**
-     * Points for known vulnerabilities, weighted by their real severity when available; otherwise the old
-     * count-based rule (25 per vulnerability, at most 60) is used.
+     * Points for known vulnerabilities: the points of the most severe one, plus a small amount for each additional
+     * vulnerability (so that a library with many issues ranks above one with a single issue of the same severity,
+     * without every vulnerable library saturating the scale). Without severity data the old count-based rule
+     * (25 per vulnerability, at most 60) is used.
      */
     private int vulnerabilityPoints(DependencyEnrichmentDto enrichment, int vulnCount) {
         Map<String, Integer> counts = enrichment.severityCounts();
@@ -148,20 +153,26 @@ public class DeterministicRiskCalculator {
             return Math.min(vulnCount * 25, 60);
         }
 
-        int points = 0;
+        int top = 0;
         int classified = 0;
         for (Map.Entry<String, Integer> e : counts.entrySet()) {
             int n = e.getValue() == null ? 0 : e.getValue();
+            if (n <= 0) {
+                continue;
+            }
             classified += n;
-            points += n * switch (e.getKey()) {
+            top = Math.max(top, switch (e.getKey()) {
                 case "CRITICAL" -> CRITICAL_POINTS;
                 case "HIGH" -> HIGH_POINTS;
                 case "LOW" -> LOW_POINTS;
                 default -> MEDIUM_POINTS;
-            };
+            });
         }
-        points += Math.max(0, vulnCount - classified) * UNKNOWN_SEVERITY_POINTS;
-        return Math.min(points, MAX_VULNERABILITY_POINTS);
+        if (classified < vulnCount) {
+            top = Math.max(top, UNKNOWN_SEVERITY_POINTS);
+        }
+        int extra = Math.min(MAX_EXTRA_POINTS, Math.max(0, vulnCount - 1) * EXTRA_VULNERABILITY_POINTS);
+        return Math.min(top + extra, MAX_VULNERABILITY_POINTS);
     }
 
     private RiskLevel determineRiskLevel(int score) {
