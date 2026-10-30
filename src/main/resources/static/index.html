@@ -445,6 +445,27 @@
     </footer>
   </div>
 
+  <div class="modal" id="browseModal" hidden>
+    <div class="modal__backdrop" data-close="true" aria-hidden="true"></div>
+    <div class="modal__panel" role="dialog" aria-modal="true" aria-labelledby="browseTitle">
+      <div class="modal__header">
+        <div class="modal__title-wrap">
+          <div class="modal__title" id="browseTitle">Select project folder or build file</div>
+          <div class="modal__subtitle mono" id="browsePath">--</div>
+        </div>
+        <button class="btn btn--ghost" type="button" id="closeBrowse" aria-label="Close">Close</button>
+      </div>
+      <div class="modal__body">
+        <div class="form-actions">
+          <button type="button" class="btn btn--ghost" id="browseUp">Up</button>
+          <button type="button" class="btn btn--primary" id="browseSelect">Use this folder</button>
+        </div>
+        <p class="muted" id="browseError" role="alert" hidden></p>
+        <ul class="fs-list" id="browseList"></ul>
+      </div>
+    </div>
+  </div>
+
   <div class="modal" id="detailsModal" hidden>
     <div class="modal__backdrop" data-close="true" aria-hidden="true"></div>
     <div class="modal__panel" role="dialog" aria-modal="true" aria-labelledby="detailsTitle">
