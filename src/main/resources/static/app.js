@@ -39,6 +39,7 @@ const BuildAegis = (() => {
       CACHED_RESULTS: '/dashboard/cached-results',
       AI_SETTINGS: '/ai/settings',
       AI_TEST: '/ai/test-connection',
+      AI_ASK: '/ai/ask',
       EXPORT_JSON: '/export/json',
       EXPORT_PDF: '/export/pdf',
       VULN_ANALYZE: '/vulnerabilities/analyze',
@@ -158,6 +159,19 @@ const BuildAegis = (() => {
   };
 
   // AI Settings
+  // One-click setups for OpenAI-compatible services (used with the "Custom" provider). Models are suggestions.
+  const AI_PRESETS = {
+    openrouter: { endpoint: 'https://openrouter.ai/api/v1/chat/completions', model: 'openai/gpt-4o-mini' },
+    groq: { endpoint: 'https://api.groq.com/openai/v1/chat/completions', model: 'llama-3.3-70b-versatile' },
+    together: { endpoint: 'https://api.together.xyz/v1/chat/completions', model: 'meta-llama/Llama-3.3-70B-Instruct-Turbo' },
+    mistral: { endpoint: 'https://api.mistral.ai/v1/chat/completions', model: 'mistral-small-latest' },
+    deepseek: { endpoint: 'https://api.deepseek.com/chat/completions', model: 'deepseek-chat' },
+    lmstudio: { endpoint: 'http://localhost:1234/v1/chat/completions', model: 'local-model' }
+  };
+
+  // The finding currently open in the details dialog (used by the "Ask AI" box)
+  let askFinding = null;
+
   const AISettings = {
     async load() {
       try {
@@ -449,6 +463,17 @@ const BuildAegis = (() => {
         this.onAIFieldChange();
       });
       if (aiModel) DOM.on(aiModel, 'input', () => this.onAIFieldChange());
+      const aiPreset = DOM.get('aiPreset');
+      if (aiPreset) DOM.on(aiPreset, 'change', (e) => this.applyAiPreset(e.target.value));
+
+      // "Ask AI about this finding" box in the details dialog
+      DOM.on(DOM.get('askSubmit'), 'click', () => this.askAboutFinding());
+      DOM.on(DOM.get('askQuestion'), 'keydown', (e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          this.askAboutFinding();
+        }
+      });
       if (aiApiKey) DOM.on(aiApiKey, 'input', () => this.onAIFieldChange());
       
       // Analyze button
@@ -538,10 +563,67 @@ const BuildAegis = (() => {
       // Show/hide custom endpoint field based on provider
       if (customEndpointRow) {
         customEndpointRow.hidden = aiProvider !== 'custom';
+        const presetRow = DOM.get('aiPresetRow');
+        if (presetRow) presetRow.hidden = aiProvider !== 'custom';
+        const presetEl = DOM.get('aiPreset');
+        if (presetEl) {
+          presetEl.value = Object.keys(AI_PRESETS).find(k => AI_PRESETS[k].endpoint === (customEndpoint || '')) || '';
+        }
       }
       
       const enableCheckbox = DOM.get('enableAI');
       if (enableCheckbox) enableCheckbox.checked = aiEnabled || false;
+    },
+
+    applyAiPreset(key) {
+      const preset = AI_PRESETS[key];
+      if (!preset) return;
+      const endpointEl = DOM.get('customEndpoint');
+      const modelEl = DOM.get('aiModel');
+      if (endpointEl) endpointEl.value = preset.endpoint;
+      if (modelEl) modelEl.value = preset.model;
+      this.onAIFieldChange();
+    },
+
+    async askAboutFinding() {
+      const finding = askFinding;
+      const questionEl = DOM.get('askQuestion');
+      const answerEl = DOM.get('askAnswer');
+      const submitBtn = DOM.get('askSubmit');
+      const question = questionEl?.value.trim() || '';
+      if (!finding || !answerEl) return;
+      if (!question) {
+        answerEl.textContent = 'Please type a question first.';
+        answerEl.hidden = false;
+        return;
+      }
+
+      submitBtn.disabled = true;
+      answerEl.textContent = 'Asking...';
+      answerEl.hidden = false;
+      try {
+        const recommendations = String(finding.affectedVersions || '').split('\n').map(s => s.trim()).filter(s => s && s !== '--');
+        const advisoryId = finding.id && !String(finding.id).includes(':') ? [finding.id] : [];
+        const data = await API.request(API.ENDPOINTS.AI_ASK, {
+          method: 'POST',
+          body: JSON.stringify({
+            dependency: finding.dependency,
+            severity: finding.severity,
+            vulnerabilityCount: finding.vulnerabilityCount || 0,
+            vulnerabilityIds: advisoryId,
+            knownExploited: !!finding.knownExploited,
+            fixVersion: finding.suggestedFixVersion || null,
+            explanation: finding.explanationText || finding.description || null,
+            recommendations,
+            question
+          })
+        });
+        answerEl.textContent = data?.answer || 'No answer was returned.';
+      } catch (error) {
+        answerEl.textContent = `Could not get an answer: ${error.message}`;
+      } finally {
+        submitBtn.disabled = false;
+      }
     },
 
     onAIFieldChange() {
@@ -556,6 +638,8 @@ const BuildAegis = (() => {
       // Show/hide custom endpoint field based on provider
       if (customEndpointRow) {
         customEndpointRow.hidden = provider !== 'custom';
+        const presetRow = DOM.get('aiPresetRow');
+        if (presetRow) presetRow.hidden = provider !== 'custom';
       }
       
       // Clear custom endpoint if not custom provider
@@ -1020,6 +1104,18 @@ const BuildAegis = (() => {
       DOM.setText(DOM.get('detailsConfidence'), `Confidence: ${String(finding.confidence || '--').toUpperCase()}`);
       DOM.setText(DOM.get('detailsDirectness'), finding.directness || '--');
       DOM.setText(DOM.get('detailsSource'), `Source: ${finding.source || '--'}`);
+
+      // "Ask AI" box: only when AI is enabled; start fresh for every finding
+      askFinding = finding;
+      const askSection = DOM.get('askSection');
+      if (askSection) askSection.hidden = !State.settings.aiEnabled;
+      const askAnswer = DOM.get('askAnswer');
+      if (askAnswer) {
+        askAnswer.hidden = true;
+        askAnswer.textContent = '';
+      }
+      const askQuestion = DOM.get('askQuestion');
+      if (askQuestion) askQuestion.value = '';
 
       // Exploit information: only shown when available
       const exploitEl = DOM.get('detailsExploit');

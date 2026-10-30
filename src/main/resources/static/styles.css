@@ -1124,3 +1124,8 @@ html.lite *, html.lite *::before, html.lite *::after{
 .fs-item--file{color:var(--muted);}
 
 .pill--danger{background:rgba(220,38,38,.18); color:#ef4444; border-color:rgba(220,38,38,.45); font-weight:600;}
+
+/* Ask AI about a finding */
+.ask-row{display:flex; gap:8px; align-items:center;}
+.ask-row .form-input{flex:1; min-width:0;}
+#askAnswer{margin-top:10px; white-space:pre-wrap;}
