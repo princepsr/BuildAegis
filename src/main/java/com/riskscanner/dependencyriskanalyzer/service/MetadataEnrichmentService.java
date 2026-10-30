@@ -36,13 +36,13 @@ import java.util.List;
 public class MetadataEnrichmentService {
 
     private final ObjectMapper objectMapper;
-    private final HttpClient httpClient;
+    /** Created on first use, so constructing the service needs no network stack. */
+    private volatile HttpClient httpClient;
     private final ExploitDataService exploitDataService;
 
     public MetadataEnrichmentService(ObjectMapper objectMapper, ExploitDataService exploitDataService) {
         this.exploitDataService = exploitDataService;
         this.objectMapper = objectMapper;
-        this.httpClient = HttpClient.newHttpClient();
     }
 
     /**
@@ -107,6 +107,19 @@ public class MetadataEnrichmentService {
         );
     }
 
+    private HttpClient client() {
+        HttpClient c = httpClient;
+        if (c == null) {
+            synchronized (this) {
+                if (httpClient == null) {
+                    httpClient = HttpClient.newHttpClient();
+                }
+                c = httpClient;
+            }
+        }
+        return c;
+    }
+
     private OsvAdvisoryParser.Summary queryOsv(String ecosystem, String packageName, String version) {
         try {
             String body = "{\"package\":{\"ecosystem\":\"" + ecosystem + "\",\"name\":\"" + escapeJson(packageName) + "\"},\"version\":\"" + escapeJson(version) + "\"}";
@@ -117,7 +130,7 @@ public class MetadataEnrichmentService {
                     .POST(HttpRequest.BodyPublishers.ofString(body))
                     .build();
 
-            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+            HttpResponse<String> response = client().send(request, HttpResponse.BodyHandlers.ofString());
             if (response.statusCode() / 100 != 2) {
                 return OsvAdvisoryParser.Summary.unknown();
             }
@@ -139,7 +152,7 @@ public class MetadataEnrichmentService {
                     .GET()
                     .build();
 
-            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+            HttpResponse<String> response = client().send(request, HttpResponse.BodyHandlers.ofString());
             if (response.statusCode() / 100 != 2) {
                 return new ScmResult(null, null);
             }
@@ -166,7 +179,7 @@ public class MetadataEnrichmentService {
                     .GET()
                     .build();
 
-            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+            HttpResponse<String> response = client().send(request, HttpResponse.BodyHandlers.ofString());
             if (response.statusCode() / 100 != 2) {
                 return null;
             }
