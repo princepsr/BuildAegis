@@ -127,12 +127,12 @@ This starts the same Spring Boot backend locally and loads the UI inside a JavaF
 .\mvnw clean package
 ```
 
-This runs the tests and creates a self-contained, runnable jar: `target\dependency-risk-analyzer-<version>.jar` (about 75 MB, all dependencies included; the version comes from `pom.xml`). Add `-DskipTests` to skip the tests.
+This runs the tests and creates a self-contained, runnable jar: `target\BuildAegis.v<version>.jar` (for example `BuildAegis.v3.0.0.jar`, about 75 MB, all dependencies included; the version comes from `<version>` in `pom.xml`, so raise it there for a new release). Add `-DskipTests` to skip the tests.
 
 Run the built jar (UI at `http://localhost:8080/buildaegis/`):
 
 ```powershell
-java -jar target\dependency-risk-analyzer-0.0.1-SNAPSHOT.jar
+java -jar target\BuildAegis.v3.0.0.jar
 ```
 
 The same jar can scan a project without the UI for CI: add `--buildaegis.cli.project=<path>` (see [Command Line and CI](docs/user-guide/cli-and-ci.md)).
@@ -140,7 +140,7 @@ The same jar can scan a project without the UI for CI: add `--buildaegis.cli.pro
 Notes:
 - If `clean` fails with "Failed to delete ... target\classes", an instance of the app is still running from `target`. Stop it, or run `.\mvnw package` without `clean`.
 - The jar is a build artifact and is not committed (`target/` is gitignored).
-- **Publishing a release**: rename the jar (for example `BuildAegis.v3.0.jar`) and attach it to the GitHub release: `gh release upload <tag> BuildAegis.v3.0.jar`, or drag it onto the release page.
+- **Publishing a release**: set the new version in `pom.xml`, build, and attach `target\BuildAegis.v<version>.jar` to the GitHub release: `gh release upload <tag> target\BuildAegis.v<version>.jar`, or drag it onto the release page.
 - The JavaFX desktop version is built separately with the `desktop` Maven profile (`-Pdesktop`) and needs platform-specific JavaFX libraries.
 
 ## Configuration
