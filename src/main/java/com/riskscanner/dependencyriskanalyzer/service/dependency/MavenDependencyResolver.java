@@ -59,6 +59,12 @@ import java.util.Set;
  */
 @Component
 public class MavenDependencyResolver implements DependencyResolver {
+    /**
+     * The root node stands for the scanned project itself. It is only a container for the declared dependencies and may
+     * not exist in any repository (an unpublished project or version), so it must never be downloaded.
+     */
+    private static final org.eclipse.aether.graph.DependencyFilter EXCLUDE_ROOT = (node, parents) -> !parents.isEmpty();
+
 
     private static final String MAVEN_CENTRAL = "https://repo.maven.apache.org/maven2/";
     private static final Logger logger = LoggerFactory.getLogger(MavenDependencyResolver.class.getName());
@@ -189,7 +195,7 @@ public class MavenDependencyResolver implements DependencyResolver {
             org.eclipse.aether.graph.DependencyNode aetherRoot = collectResult.getRoot();
 
             // Now resolve to get the full tree with transitive deps
-            DependencyRequest dependencyRequest = new DependencyRequest(aetherRoot, null);
+            DependencyRequest dependencyRequest = new DependencyRequest(aetherRoot, EXCLUDE_ROOT);
             repositorySystem.resolveDependencies(session, dependencyRequest);
 
             // Convert to our model - children of root are direct dependencies
@@ -767,7 +773,7 @@ public class MavenDependencyResolver implements DependencyResolver {
             org.eclipse.aether.graph.DependencyNode aetherRoot = collectResult.getRoot();
 
             // Now resolve to get the full tree with transitive deps
-            DependencyRequest dependencyRequest = new DependencyRequest(aetherRoot, null);
+            DependencyRequest dependencyRequest = new DependencyRequest(aetherRoot, EXCLUDE_ROOT);
             repositorySystem.resolveDependencies(session, dependencyRequest);
             
             // Convert to our model - children of root are direct dependencies
