@@ -158,6 +158,44 @@ const BuildAegis = (() => {
     }
   };
 
+  // Collapsible input panel (left side): gives the results more room; the choice is remembered
+  const LeftPanel = {
+    KEY: 'buildaegis.leftPanelCollapsed',
+    isCollapsed() {
+      const grid = document.getElementById('appGrid');
+      return !!grid && grid.classList.contains('app-grid--left-collapsed');
+    },
+    apply(collapsed) {
+      const grid = document.getElementById('appGrid');
+      const btn = document.getElementById('leftPanelToggle');
+      if (!grid || !btn) return;
+      grid.classList.toggle('app-grid--left-collapsed', collapsed);
+      btn.setAttribute('aria-expanded', String(!collapsed));
+      const label = collapsed ? 'Expand the input panel' : 'Collapse the input panel';
+      btn.setAttribute('aria-label', label);
+      btn.title = `${label} ( [ )`;
+    },
+    toggle() {
+      const collapsed = !this.isCollapsed();
+      this.apply(collapsed);
+      try { localStorage.setItem(this.KEY, collapsed ? '1' : '0'); } catch (e) { /* storage may be unavailable */ }
+    },
+    init() {
+      const btn = document.getElementById('leftPanelToggle');
+      if (!btn) return;
+      let stored = false;
+      try { stored = localStorage.getItem(this.KEY) === '1'; } catch (e) { /* ignore */ }
+      this.apply(stored);
+      btn.addEventListener('click', () => this.toggle());
+      document.addEventListener('keydown', (e) => {
+        if (e.key !== '[' || e.ctrlKey || e.metaKey || e.altKey) return;
+        const t = e.target;
+        if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable)) return;
+        this.toggle();
+      });
+    }
+  };
+
   // AI Settings
   // One-click setups for OpenAI-compatible services (used with the "Custom" provider). Models are suggestions.
   const AI_PRESETS = {
@@ -1691,6 +1729,7 @@ const BuildAegis = (() => {
       State.loadSettings();
 
       Theme.init();
+      LeftPanel.init();
       
       // Load AI settings
       AISettings.load().catch(() => null);

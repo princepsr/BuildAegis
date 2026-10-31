@@ -988,8 +988,30 @@ body{
 }
 @keyframes spin{to{transform:rotate(360deg)}}
 
+/* Collapsible input panel: the results panel takes the freed space */
+.app-grid{transition:grid-template-columns .18s ease, max-width .18s ease;}
+.panel__header--toggle{display:flex; align-items:center; justify-content:space-between; gap:8px;}
+.panel-toggle{
+  display:inline-flex; align-items:center; justify-content:center;
+  width:30px; height:30px; padding:0; flex:none;
+  border:1px solid var(--border); border-radius:var(--radius-sm);
+  background:transparent; color:var(--muted, var(--text)); cursor:pointer;
+}
+.panel-toggle:hover{color:var(--text); border-color:var(--accent, var(--text));}
+.panel-toggle:focus-visible{outline:2px solid var(--accent, var(--text)); outline-offset:2px;}
+.panel-toggle svg{transition:transform .18s ease;}
+.app-grid--left-collapsed{grid-template-columns:56px 1fr; max-width:1600px;}
+.app-grid--left-collapsed .panel--left .panel__body,
+.app-grid--left-collapsed .panel--left .panel__title{display:none;}
+.app-grid--left-collapsed .panel--left .panel__header{padding:12px 11px; border-bottom:0; justify-content:center;}
+.app-grid--left-collapsed .panel-toggle svg{transform:rotate(180deg);}
+@media (prefers-reduced-motion: reduce){
+  .app-grid, .panel-toggle svg{transition:none;}
+}
+
 @media (max-width: 1020px){
-  .app-grid{grid-template-columns: 1fr;}
+  .app-grid, .app-grid.app-grid--left-collapsed{grid-template-columns: 1fr;}
+  .app-grid--left-collapsed .panel--left .panel__header{justify-content:space-between;}
 }
 @media (max-width: 520px){
   .summary-grid{grid-template-columns:repeat(2, minmax(0, 1fr));}

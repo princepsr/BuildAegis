@@ -58,6 +58,8 @@ Shows current application state:
 
 ## Left Panel: Input & Configuration
 
+The panel can be collapsed to a thin strip with the arrow button in its header (or the `[` key) so the results get the full width. Click the arrow again to bring it back. The choice is remembered in the browser. On narrow windows the panel is stacked above the results and collapsing it hides the configuration so the results move up.
+
 ### 1. Build Tool Section
 
 #### Tool Selection
