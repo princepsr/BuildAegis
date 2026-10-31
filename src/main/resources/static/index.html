@@ -259,23 +259,23 @@
                     <div class="kpi__k">Total dependencies</div>
                     <div class="kpi__v mono" id="kpiTotalDependencies">--</div>
                   </div>
-                  <div class="kpi kpi--neutral" aria-label="Vulnerabilities found" data-tooltip="Dependencies with at least one known vulnerability from OSV database">
+                  <div class="kpi kpi--neutral" aria-label="Vulnerabilities found" data-tooltip="Dependencies with at least one known vulnerability from OSV, of any severity. This includes dependencies whose worst vulnerability is Low, which are counted in the Low tile, so it can be higher than Critical + High + Medium.">
                     <div class="kpi__k">Vulnerabilities found</div>
                     <div class="kpi__v mono" id="kpiVulnsFound">--</div>
                   </div>
-                  <div class="kpi kpi--bad" aria-label="Critical" data-tooltip="Dependencies with 10+ CVEs or critical severity vulnerabilities">
+                  <div class="kpi kpi--bad" aria-label="Critical" data-tooltip="Dependencies whose worst vulnerability is Critical, or that have a vulnerability exploited in the wild (CISA KEV)">
                     <div class="kpi__k">Critical</div>
                     <div class="kpi__v mono" id="kpiCritical">--</div>
                   </div>
-                  <div class="kpi kpi--warn" aria-label="High" data-tooltip="Dependencies with 5-9 high severity vulnerabilities">
+                  <div class="kpi kpi--warn" aria-label="High" data-tooltip="Dependencies whose worst vulnerability is High severity">
                     <div class="kpi__k">High</div>
                     <div class="kpi__v mono" id="kpiHigh">--</div>
                   </div>
-                  <div class="kpi kpi--mid" aria-label="Medium" data-tooltip="Dependencies with 2-4 medium severity vulnerabilities">
+                  <div class="kpi kpi--mid" aria-label="Medium" data-tooltip="Dependencies whose worst vulnerability is Medium severity">
                     <div class="kpi__k">Medium</div>
                     <div class="kpi__v mono" id="kpiMedium">--</div>
                   </div>
-                  <div class="kpi kpi--good" aria-label="Low" data-tooltip="Dependencies with 0-1 low severity vulnerabilities">
+                  <div class="kpi kpi--good" aria-label="Low" data-tooltip="Dependencies with no known vulnerabilities, plus those whose worst vulnerability is Low severity. Critical + High + Medium + Low equals Total dependencies.">
                     <div class="kpi__k">Low</div>
                     <div class="kpi__v mono" id="kpiLow">--</div>
                   </div>

@@ -114,4 +114,4 @@ The chip always reflects the whole project:
 
 ## Suggested Fix Version
 
-The suggested version is the smallest one that fixes the vulnerabilities **on the same major version** as the one you use (for example 6.2.2 suggests 6.2.19, not 7.0.9). If some vulnerabilities are only fixed in another major version, the details say so ("2 of 14 vulnerabilities are not fixed in this major version; fixing them needs a major upgrade to 7.0.9"). Only when nothing is fixed on your major version is a version on another major line suggested.
+The suggested version is the smallest one that fixes the vulnerabilities **on the same major version** as the one you use (for example 6.2.2 suggests 6.2.19, not 7.0.9). If some vulnerabilities are only fixed in another major version, the details say so ("2 of 14 vulnerabilities are not fixed in this minor version (6.2.x); fixing them needs a major upgrade to 7.0.9"). Only when nothing is fixed on your major version is a version on another major line suggested.
