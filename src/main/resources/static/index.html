@@ -27,13 +27,17 @@
     </header>
 
     <main class="app-main" role="main">
-      <div class="app-grid" aria-label="Scanner workspace">
-        <section class="panel panel--left" aria-labelledby="panelLeftTitle">
-          <header class="panel__header">
+      <div class="app-grid" id="appGrid" aria-label="Scanner workspace">
+        <section class="panel panel--left" id="panelLeft" aria-labelledby="panelLeftTitle">
+          <header class="panel__header panel__header--toggle">
             <h2 id="panelLeftTitle" class="panel__title">Input &amp; Configuration</h2>
+            <button type="button" id="leftPanelToggle" class="panel-toggle" aria-controls="leftPanelBody" aria-expanded="true"
+                    aria-label="Collapse the input panel" title="Collapse the input panel ( [ )">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="15 18 9 12 15 6"></polyline></svg>
+            </button>
           </header>
 
-          <div class="panel__body">
+          <div class="panel__body" id="leftPanelBody">
             <section class="card" aria-labelledby="buildToolTitle">
               <div class="card__title-row">
                 <h3 id="buildToolTitle" class="card__title">Build tool</h3>

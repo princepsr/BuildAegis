@@ -402,6 +402,7 @@ Useful for:
 | `Ctrl/Cmd + Enter` | Start analysis (when path entered) |
 | `Escape` | Close modal / clear search |
 | `Ctrl/Cmd + F` | Focus search box |
+| `[` | Collapse / expand the input panel (when not typing in a field) |
 
 ### Error Handling
 
