@@ -36,7 +36,8 @@ class UpgradeAdvisorTest {
         assertEquals("6.2.19", UpgradeAdvisor.suggestFixVersion("6.2.2", fixes));
         String note = UpgradeAdvisor.fixNote("6.2.19", fixes);
         assertTrue(note.startsWith("2 of 4 vulnerabilities"));
-        assertTrue(note.contains("7.0.9"));
+        assertTrue(note.contains("not fixed in this minor version (6.2.x)"));
+        assertTrue(note.contains("major upgrade to 7.0.9"));
     }
 
     @Test

@@ -97,7 +97,10 @@ public final class UpgradeAdvisor {
         if (remaining == 0) {
             return null;
         }
-        return remaining + " of " + fixedVersionsPerVulnerability.size() + " vulnerabilities are not fixed in this major version; fixing them needs a major upgrade to " + needed + ".";
+        List<String> parts = numericParts(suggested);
+        String line = parts.size() > 1 ? parts.get(0) + "." + parts.get(1) + ".x" : parts.isEmpty() ? suggested : parts.get(0) + ".x";
+        return remaining + " of " + fixedVersionsPerVulnerability.size() + " vulnerabilities are not fixed in this minor version (" + line
+                + "); fixing them needs a major upgrade to " + needed + ".";
     }
 
     private static String pick(String current, List<List<String>> fixedPerVuln, boolean sameMajorOnly) {

@@ -74,7 +74,7 @@ Notes:
 - `knownExploited`: true if a vulnerability is in the CISA Known Exploited Vulnerabilities catalog
 - `maxEpssScore`: highest EPSS exploit probability (0-1) among the vulnerabilities
 - `suggestedFixVersion`: smallest version fixing the known vulnerabilities, preferring the same major version as the one in use
-- `fixNote`: set when that version leaves some vulnerabilities unfixed because they are only fixed in another major version (for example "2 of 14 vulnerabilities are not fixed in this major version; fixing them needs a major upgrade to 7.0.9.")
+- `fixNote`: set when that version leaves some vulnerabilities unfixed because they are only fixed in another major version (for example "2 of 14 vulnerabilities are not fixed in this minor version (6.2.x); fixing them needs a major upgrade to 7.0.9.")
 
 ### GET `/api/project/scan?projectPath=...`
 
