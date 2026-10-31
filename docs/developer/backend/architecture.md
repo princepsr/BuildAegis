@@ -599,7 +599,7 @@ Spring Boot Actuator endpoints:
 
 ### H2 Console
 
-Access at: `http://localhost:8080/buildaegis/h2-console`
+Access at: `http://localhost:8080/buildaegis/h2-console` (off by default; start the app with `BUILDAEGIS_H2_CONSOLE=true` to enable it)
 
 Connection details:
 - JDBC URL: `jdbc:h2:file:./data/buildaegis`
