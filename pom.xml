@@ -11,7 +11,7 @@
 	</parent>
 	<groupId>com.riskscanner</groupId>
 	<artifactId>dependency-risk-analyzer</artifactId>
-	<version>0.0.1-SNAPSHOT</version>
+	<version>3.0.0</version>
 	<name>BuildAegis</name>
 	<description>A tool for analyzing dependency risks in Java projects</description>
 	<url>https://github.com/princepsr/BuildAegis</url>
@@ -265,6 +265,8 @@
 	</profiles>
 
 	<build>
+		<!-- Release file name, e.g. BuildAegis.v3.0.0.jar -->
+		<finalName>BuildAegis.v${project.version}</finalName>
 		<plugins>
 			<plugin>
 				<groupId>org.springframework.boot</groupId>

@@ -127,11 +127,21 @@ This starts the same Spring Boot backend locally and loads the UI inside a JavaF
 .\mvnw clean package
 ```
 
-Run the built jar:
+This runs the tests and creates a self-contained, runnable jar: `target\BuildAegis.v<version>.jar` (for example `BuildAegis.v3.0.0.jar`, about 75 MB, all dependencies included; the version comes from `<version>` in `pom.xml`, so raise it there for a new release). Add `-DskipTests` to skip the tests.
+
+Run the built jar (UI at `http://localhost:8080/buildaegis/`):
 
 ```powershell
-java -jar target\dependency-risk-analyzer-0.0.1-SNAPSHOT.jar
+java -jar target\BuildAegis.v3.0.0.jar
 ```
+
+The same jar can scan a project without the UI for CI: add `--buildaegis.cli.project=<path>` (see [Command Line and CI](docs/user-guide/cli-and-ci.md)).
+
+Notes:
+- If `clean` fails with "Failed to delete ... target\classes", an instance of the app is still running from `target`. Stop it, or run `.\mvnw package` without `clean`.
+- The jar is a build artifact and is not committed (`target/` is gitignored).
+- **Publishing a release**: set the new version in `pom.xml`, build, and attach `target\BuildAegis.v<version>.jar` to the GitHub release: `gh release upload <tag> target\BuildAegis.v<version>.jar`, or drag it onto the release page.
+- The JavaFX desktop version is built separately with the `desktop` Maven profile (`-Pdesktop`) and needs platform-specific JavaFX libraries.
 
 ## Configuration
 
@@ -140,7 +150,7 @@ Main configuration file:
 
 Key settings:
 - **H2 database**: persisted to `./data/buildaegis`
-- **H2 console**: `http://localhost:8080/buildaegis/h2-console`
+- **H2 console**: `http://localhost:8080/buildaegis/h2-console` (off by default; start the app with `BUILDAEGIS_H2_CONSOLE=true` to enable it)
 - **Encryption secret**: `buildaegis.encryption.secret`
   - Set this for stable encryption across restarts
   - If you change it later, previously stored encrypted API keys cannot be decrypted

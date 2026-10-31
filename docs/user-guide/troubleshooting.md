@@ -514,9 +514,10 @@ curl https://api.openai.com/v1/models \
 ### Database Issues
 
 #### "H2 console not accessible"
-**Symptoms**: Can't access `http://localhost:8080/buildaegis/h2-console`
+**Symptoms**: Can't access `http://localhost:8080/buildaegis/h2-console` (404)
 
 **Solutions**:
+0. The console is **off by default** since 2.x security hardening: start the app with `BUILDAEGIS_H2_CONSOLE=true` and open it again.
 1. Verify property in `application.properties`:
    ```properties
    spring.h2.console.enabled=true
@@ -643,7 +644,7 @@ java -version  # Should show Java 21
 curl http://localhost:8080/buildaegis/actuator/health
 
 # 4. Check database
-curl http://localhost:8080/buildaegis/h2-console  # Should return HTML
+curl http://localhost:8080/buildaegis/h2-console  # Returns HTML only if BUILDAEGIS_H2_CONSOLE=true (404 otherwise)
 
 # 5. Test API
 curl "http://localhost:8080/buildaegis/api/project/scan?projectPath=/valid/path"
