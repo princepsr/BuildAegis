@@ -162,11 +162,11 @@ Seven metric cards showing:
 | Card | Meaning | Follows filters? |
 |------|---------|------------------|
 | Total dependencies | Dependencies in the current view | Yes |
-| Vulnerabilities found | Dependencies with at least one known vulnerability (not the number of CVEs) | Yes |
-| Critical | Dependencies with 10+ known vulnerabilities | Yes |
-| High | Backend risk level HIGH (score 70+) | Yes |
-| Medium | Backend risk level MEDIUM (score 40-69) | Yes |
-| Low | Backend risk level LOW, including dependencies without vulnerabilities | Yes |
+| Vulnerabilities found | Dependencies with at least one known vulnerability of any severity (not the number of CVEs). Includes dependencies counted under Low, so it can be higher than Critical + High + Medium | Yes |
+| Critical | Worst vulnerability is Critical, or a vulnerability is exploited in the wild (CISA KEV) | Yes |
+| High | Worst vulnerability is High severity | Yes |
+| Medium | Worst vulnerability is Medium severity | Yes |
+| Low | Worst vulnerability is Low severity, plus all dependencies without known vulnerabilities. Critical + High + Medium + Low equals Total dependencies | Yes |
 | **Overall risk score** | 0-100 for the **whole project**: highest dependency score plus up to +5 for other vulnerable dependencies | **No** |
 
 **Overall risk score and filters.** The overall risk score and the status chip (top right) always describe the whole project. Applying a filter or a search changes the findings list and the count tiles, but **not** the overall score. While a filter or search is active, a **"Filtered view: N"** line appears under the overall score with the score of just the visible findings. See [Risk Scoring](../architecture/risk-scoring.md).
